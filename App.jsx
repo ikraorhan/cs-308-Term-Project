@@ -6,6 +6,7 @@ import Menubar from './components/Menubar';
 import Homepage from './components/Homepage';
 import Products from './components/Products';
 import Cart from './components/Cart';
+import About from './components/About.jsx';
 import './App.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/products" element={<Products />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/about" element={<About />} />
           {/* Diğer route'lar buraya eklenecek */}
         </Routes>
       </div>

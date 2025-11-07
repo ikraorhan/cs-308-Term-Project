@@ -44,9 +44,9 @@ function Menubar() {
             </ul>
           )}
         </li>
-        
+
         <li><Link to="/about">Hakkımızda</Link></li>
-        
+
         {userEmail ? (
           <>
             <li><Link to="/products">Products</Link></li>
