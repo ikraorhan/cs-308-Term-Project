@@ -1,68 +1,30 @@
-// Menubar.jsx - Verda's work (SCRUM-16)
+import React from "react";
+import { Link } from "react-router-dom";
+import "./Menubar.css";
 
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import './Menubar.css';
-
-function Menubar() {
-  const [categoriesDropdownOpen, setCategoriesDropdownOpen] = useState(false);
-  const navigate = useNavigate();
-  const userEmail = localStorage.getItem('user_email');
-
-  const handleLogout = () => {
-    // Mock sistem için temizlik
-    localStorage.removeItem('firebase_token');
-    localStorage.removeItem('user_uid');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_name');
-    localStorage.removeItem('user_id');
-    localStorage.removeItem('is_authenticated');
-    navigate('/login');
-  };
-
+export default function Menubar({ user, onLogout }) {
   return (
     <nav className="menubar">
       <div className="logo">
-        <Link to="/">Pet Shop <span className="paw-icon-nav">🐾</span></Link>
+        <Link to="/">Pet Shop 🐾</Link>
       </div>
-      <ul className="menu-items">
-        <li><Link to="/">Ana Sayfa</Link></li>
-        
-        {/* Kategoriler Dropdown */}
-        <li 
-          className="dropdown"
-          onMouseEnter={() => setCategoriesDropdownOpen(true)}
-          onMouseLeave={() => setCategoriesDropdownOpen(false)}
-        >
-          <Link to="/products" className="dropdown-trigger">Kategoriler</Link>
-          {categoriesDropdownOpen && (
-            <ul className="dropdown-content">
-              <li><Link to="/products?category=Food">Köpek Ürünleri</Link></li>
-              <li><Link to="/products?category=Accessories">Kedi Ürünleri</Link></li>
-              <li><Link to="/products?category=Housing">Kuş Ürünleri</Link></li>
-              <li><Link to="/products?category=Toys">Akvaryum</Link></li>
-            </ul>
-          )}
-        </li>
-
-        <li><Link to="/about">Hakkımızda</Link></li>
-
-        {userEmail ? (
+      <div className="menu-links">
+        <Link to="/">Home</Link>
+        <Link to="/products">Products</Link>
+        <Link to="/categories">Categories</Link>
+        <Link to="/about">About Us</Link>
+        <Link to="/cart">Cart</Link>
+      </div>
+      <div className="user-section">
+        {user ? (
           <>
-            <li><Link to="/products">Products</Link></li>
-            <li><Link to="/cart">Sepetim</Link></li>
-            <li className="user-menu">
-              <span className="user-email">{userEmail}</span>
-              <button onClick={handleLogout} className="logout-btn">Logout</button>
-            </li>
+            <span>{user.email}</span>
+            <button onClick={onLogout}>Logout</button>
           </>
         ) : (
-          <li><Link to="/login">Giriş Yap</Link></li>
+          <Link to="/login">Login</Link>
         )}
-      </ul>
+      </div>
     </nav>
   );
 }
-
-export default Menubar;
-

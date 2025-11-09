@@ -30,7 +30,7 @@ function ProductCard({ product }) {
         <h3 className="product-name">{product.name}</h3>
         <p className="product-description">{product.description}</p>
         <div className="product-details">
-          <div className="product-price">${product.price.toFixed(2)}</div>
+          <div className="product-price">₺{product.price.toFixed(2)}</div>
           {product.quantity_in_stock !== undefined && (
             <div className="product-stock">
               In Stock: {product.quantity_in_stock}

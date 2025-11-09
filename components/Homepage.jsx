@@ -13,7 +13,7 @@ export default function Homepage() {
 
       <section className="featured-products">
         <h2>Featured Products</h2>
-        <Products />
+        <Products showFilters={false} />
       </section>
     </div>
   );

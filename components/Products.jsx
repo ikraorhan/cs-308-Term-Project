@@ -13,7 +13,7 @@ const CATEGORIES = [
   "Treats & Snacks",
 ];
 
-export default function Products() {
+export default function Products({ showFilters = true, limit = null }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,13 +22,15 @@ export default function Products() {
   const [sortBy, setSortBy] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get category from URL params
+  // Get category from URL params (only if showFilters is true)
   useEffect(() => {
-    const categoryParam = searchParams.get("category");
-    if (categoryParam) {
-      setSelectedCategory(categoryParam);
+    if (showFilters) {
+      const categoryParam = searchParams.get("category");
+      if (categoryParam) {
+        setSelectedCategory(categoryParam);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, showFilters]);
 
   useEffect(() => {
     async function load() {
@@ -36,12 +38,19 @@ export default function Products() {
         setLoading(true);
         setError(null);
         const params = {};
-        if (selectedCategory) params.category = selectedCategory;
-        if (searchQuery) params.search = searchQuery;
-        if (sortBy) params.sort = sortBy;
+        // Only apply filters if showFilters is true
+        if (showFilters) {
+          if (selectedCategory) params.category = selectedCategory;
+          if (searchQuery) params.search = searchQuery;
+          if (sortBy) params.sort = sortBy;
+        }
 
         const response = await productsAPI.getProducts(params);
-        const products = response?.data ?? [];
+        let products = response?.data ?? [];
+        // If limit is set, only show first N products
+        if (limit && limit > 0) {
+          products = products.slice(0, limit);
+        }
         setItems(Array.isArray(products) ? products : []);
       } catch (err) {
         console.error("Error loading products:", err);
@@ -52,7 +61,7 @@ export default function Products() {
       }
     }
     load();
-  }, [selectedCategory, searchQuery, sortBy]);
+  }, [selectedCategory, searchQuery, sortBy, showFilters, limit]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -84,57 +93,61 @@ export default function Products() {
   }
 
   return (
-    <div className="products-page">
-      <h1>Our Products</h1>
+    <div className={showFilters ? "products-page" : ""}>
+      {showFilters && <h1>Our Products</h1>}
       
-      <div className="products-filters">
-        <form onSubmit={handleSearch} className="search-form">
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-        </form>
+      {showFilters && (
+        <div className="products-filters">
+          <form onSubmit={handleSearch} className="search-form">
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </form>
 
-        <div className="filter-controls">
-          <select
-            value={selectedCategory}
-            onChange={(e) => handleCategoryChange(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Categories</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+          <div className="filter-controls">
+            <select
+              value={selectedCategory}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Categories</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">Sort by...</option>
-            <option value="price">Price: Low to High</option>
-            <option value="popularity">Popularity</option>
-          </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">Sort by...</option>
+              <option value="price">Price: Low to High</option>
+              <option value="popularity">Popularity</option>
+            </select>
 
-          <button onClick={handleReset} className="reset-button">
-            Reset Filters
-          </button>
+            <button onClick={handleReset} className="reset-button">
+              Reset Filters
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {items.length === 0 ? (
         <div className="no-products">No products found.</div>
       ) : (
         <>
-          <div className="products-count">
-            Showing {items.length} product{items.length !== 1 ? "s" : ""}
-          </div>
+          {showFilters && (
+            <div className="products-count">
+              Showing {items.length} product{items.length !== 1 ? "s" : ""}
+            </div>
+          )}
           <div className="products-grid">
             {items.map((p) => (
               <ProductCard key={p.id} product={p} />

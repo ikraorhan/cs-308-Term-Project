@@ -58,6 +58,17 @@ export function CartProvider({ children }) {
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
   };
 
+  const updateQuantity = (productId, newQuantity) => {
+    setCartItems((prev) => {
+      if (newQuantity <= 0) {
+        return prev.filter((item) => item.id !== productId);
+      }
+      return prev.map((item) =>
+        item.id === productId ? { ...item, quantity: newQuantity } : item
+      );
+    });
+  };
+
   const clearCart = () => setCartItems([]);
 
   const value = useMemo(
@@ -65,6 +76,7 @@ export function CartProvider({ children }) {
       cartItems,
       addToCart,
       removeFromCart,
+      updateQuantity,
       clearCart,
     }),
     [cartItems],
