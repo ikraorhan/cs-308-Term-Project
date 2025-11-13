@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import "./Cart.css";
+import "./Cart.css"; 
 
 export default function Cart() {
   const { cartItems, removeFromCart, updateQuantity } = useCart();
@@ -13,14 +13,28 @@ export default function Cart() {
     );
   };
 
+  const calculateTotalQuantity = () => {
+    return cartItems.reduce(
+      (sum, item) => sum + (item.quantity || 1),
+      0
+    );
+  };
+
   const subtotal = calculateTotal();
-  const shipping = 0; // Free shipping
+  const totalQuantity = calculateTotalQuantity(); 
+  const shipping = 0; 
   const total = subtotal + shipping;
 
   return (
-    <div className="cart-page">
-      <h1>My Cart 🛒</h1>
+    <div className="cart-container">
       
+      <div className="cart-header">
+        <h1>My Cart 🛒</h1>
+        {cartItems.length > 0 && (
+          <p>You have {totalQuantity} item(s) in your cart.</p>
+        )}
+      </div>
+
       {cartItems.length === 0 ? (
         <div className="empty-cart">
           <div className="empty-cart-icon">🛒</div>
@@ -46,7 +60,6 @@ export default function Cart() {
                 </div>
                 <div className="cart-item-details">
                   <h3>{item.name}</h3>
-                  <p className="item-description">{item.description}</p>
                   <p className="item-price">${(item.price || 0).toFixed(2)}</p>
                 </div>
                 <div className="cart-item-controls">
@@ -94,7 +107,11 @@ export default function Cart() {
               <span>Total:</span>
               <strong>${total.toFixed(2)}</strong>
             </div>
-            <button className="checkout-button">Proceed to Checkout</button>
+            
+            <Link to="/checkout" style={{ textDecoration: 'none' }}>
+              <button className="checkout-button">Proceed to Checkout</button>
+            </Link>
+            
             <Link to="/products">
               <button className="continue-shopping">Continue Shopping</button>
             </Link>
