@@ -31,6 +31,9 @@ INSTALLED_APPS = [
     'django.contrib.admin', 'django.contrib.auth', 'django.contrib.contenttypes',
     'django.contrib.sessions', 'django.contrib.messages', 'django.contrib.staticfiles',
     'core',  # your app
+    'api',
+    'product_manager_api',
+    'rest_framework',
 ]
 
 TEMPLATES = [
@@ -64,14 +67,7 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
