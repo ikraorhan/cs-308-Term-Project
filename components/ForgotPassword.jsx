@@ -1,27 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './ForgotPassword.css';
-import { getMockUsers, saveMockUsers } from './authUtils';
-
-const createResetToken = () => Math.random().toString(36).substring(2, 10);
-
-const getResetRequests = () => {
-  const stored = localStorage.getItem('mock_password_resets');
-  if (!stored) {
-    return [];
-  }
-  try {
-    return JSON.parse(stored);
-  } catch (error) {
-    console.warn('Corrupted password reset store. Clearing...', error);
-    localStorage.removeItem('mock_password_resets');
-    return [];
-  }
-};
-
-const saveResetRequests = (requests) => {
-  localStorage.setItem('mock_password_resets', JSON.stringify(requests));
-};
+import { authAPI } from './api';
 
 function ForgotPassword() {
   const navigate = useNavigate();
@@ -32,6 +12,7 @@ function ForgotPassword() {
   );
 
   const [email, setEmail] = useState(presetEmail);
+  const [uid, setUid] = useState('');
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,63 +27,61 @@ function ForgotPassword() {
     }
   }, [presetEmail]);
 
-  const handleRequestLink = (event) => {
-    event.preventDefault();
-    setError('');
-    setInfo('');
-
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      setError('Please enter the email associated with your account.');
-      return;
-    }
-
-    try {
-      const users = getMockUsers();
-      const user = users.find((u) => u.email === normalizedEmail);
-
-      if (!user) {
-        setError('We couldn’t find an account with that email.');
-        return;
-      }
-
-      const activeRequests = getResetRequests().filter(
-        (request) => request.email !== user.email
-      );
-      const resetToken = createResetToken();
-      const record = {
-        id: Date.now().toString(),
-        email: user.email,
-        token: resetToken,
-        requestedAt: new Date().toISOString(),
-      };
-
-      saveResetRequests([...activeRequests, record]);
-      console.info(
-        'Password reset link (demo):',
-        `https://petstore.example/reset-password?token=${resetToken}`
-      );
-      setInfo(
-        `Reset link generated! Use the token sent to ${user.email}. (Check the browser console in this demo.)`
-      );
-      setToken(resetToken);
-      setMode('reset');
-    } catch (err) {
-      console.error('Reset link request failed:', err);
-      setError('Unable to generate a reset link. Please try again.');
-    }
-  };
-
-  const handleResetPassword = (event) => {
+  const handleRequestLink = async (event) => {
     event.preventDefault();
     setError('');
     setInfo('');
     setProcessing(true);
 
     const normalizedEmail = email.trim().toLowerCase();
-
     if (!normalizedEmail) {
-      setError('Email is required.');
+      setError('Please enter the email associated with your account.');
+      setProcessing(false);
+      return;
+    }
+
+    try {
+      const response = await authAPI.requestPasswordReset(normalizedEmail);
+      
+      if (response.data) {
+        // In development mode, backend returns reset_link with uid and token
+        if (response.data.reset_link) {
+          const url = new URL(response.data.reset_link);
+          const uidParam = url.searchParams.get('uid');
+          const tokenParam = url.searchParams.get('token');
+          
+          if (uidParam && tokenParam) {
+            setUid(uidParam);
+            setToken(tokenParam);
+            setInfo(
+              `Password reset link generated! In development mode, you can use the token below. In production, check your email at ${normalizedEmail}.`
+            );
+            setMode('reset');
+          } else {
+            setInfo(response.data.message || 'Password reset link has been sent to your email.');
+            setMode('reset');
+          }
+        } else {
+          setInfo(response.data.message || 'Password reset link has been sent to your email.');
+          setMode('reset');
+        }
+      }
+    } catch (err) {
+      console.error('Reset link request failed:', err);
+      setError(err.message || 'Unable to generate a reset link. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+    setError('');
+    setInfo('');
+    setProcessing(true);
+
+    if (!uid.trim()) {
+      setError('Reset link is missing. Please request a new reset link.');
       setProcessing(false);
       return;
     }
@@ -132,46 +111,27 @@ function ForgotPassword() {
     }
 
     try {
-      const requests = getResetRequests();
-      const matchingRequest = requests.find(
-        (request) =>
-          request.email === normalizedEmail &&
-          request.token === token.trim()
-      );
-
-      if (!matchingRequest) {
-        setError('Invalid or expired reset token.');
-        setProcessing(false);
-        return;
-      }
-
-      const users = getMockUsers();
-      const userIndex = users.findIndex((u) => u.email === normalizedEmail);
-
-      if (userIndex === -1) {
-        setError('We couldn’t find an account with that email.');
-        setProcessing(false);
-        return;
-      }
-
-      const updatedUsers = [...users];
-      updatedUsers[userIndex] = {
-        ...updatedUsers[userIndex],
-        password: newPassword,
+      const resetData = {
+        uid: uid.trim(),
+        token: token.trim(),
+        new_password: newPassword,
+        new_password2: confirmPassword,
       };
-      saveMockUsers(updatedUsers);
 
-      const remainingRequests = requests.filter(
-        (request) => request.id !== matchingRequest.id
-      );
-      saveResetRequests(remainingRequests);
-
-      setInfo('Password successfully updated! Redirecting to login...');
-      setMode('success');
-      setTimeout(() => navigate('/login'), 1800);
+      const response = await authAPI.confirmPasswordReset(resetData);
+      
+      if (response.data && response.data.message) {
+        setInfo('Password successfully updated! Redirecting to login...');
+        setMode('success');
+        setTimeout(() => navigate('/login'), 1800);
+      } else {
+        setError('Password reset failed. Please try again.');
+      }
     } catch (err) {
       console.error('Password reset failed:', err);
-      setError('Unable to reset password. Please try again.');
+      const errorMessage = err.message || 'Unable to reset password. Please try again.';
+      setError(errorMessage);
+    } finally {
       setProcessing(false);
     }
   };
@@ -206,8 +166,8 @@ function ForgotPassword() {
               required
             />
           </div>
-          <button type="submit" className="primary-button">
-            Send reset link
+          <button type="submit" className="primary-button" disabled={processing}>
+            {processing ? 'Sending...' : 'Send reset link'}
           </button>
         </form>
       );

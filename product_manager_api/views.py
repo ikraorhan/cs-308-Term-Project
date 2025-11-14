@@ -383,4 +383,58 @@ def dashboard_stats(request):
         'total_categories': len(MOCK_CATEGORIES)
     }, status=status.HTTP_200_OK)
 
+# =============================
+# Create Order (Frontend Checkout)
+# =============================
+from api.views import send_invoice_email
+from datetime import datetime
+import uuid
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_order(request):
+    """Create a new order from checkout"""
+    data = request.data
+
+    required_fields = ["customer_name", "customer_email", "product_name", 
+                       "quantity", "total_price", "delivery_address"]
+
+    # missing field check
+    for field in required_fields:
+        if field not in data:
+            return Response(
+                {"error": f"Missing field: {field}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # Create delivery/order id
+    delivery_id = f"DEL-{uuid.uuid4().hex[:6].upper()}"
+
+    new_order = {
+        "delivery_id": delivery_id,
+        "customer_id": f"CUST-{uuid.uuid4().hex[:6].upper()}",
+        "customer_name": data["customer_name"],
+        "customer_email": data["customer_email"],
+        "product_id": data.get("product_id", None),
+        "product_name": data["product_name"],
+        "quantity": data["quantity"],
+        "total_price": data["total_price"],
+        "delivery_address": data["delivery_address"],
+        "status": "processing",
+        "order_date": datetime.now().strftime("%Y-%m-%d"),
+        "delivery_date": None
+    }
+
+    # Add order to mock DB
+    MOCK_ORDERS.append(new_order)
+
+    # Send email invoice
+    try:
+        send_invoice_email(new_order)
+    except Exception as e:
+        print("Email error:", e)
+
+    return Response(
+        {"message": "Order created successfully", "order": new_order},
+        status=status.HTTP_201_CREATED
+    )
