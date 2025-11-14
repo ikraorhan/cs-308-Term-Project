@@ -28,6 +28,7 @@ urlpatterns = [
     # Comment Approval
     path('comments/', views.comment_list, name='comment_list'),
     path('comments/<int:comment_id>/approve/', views.comment_approve, name='comment_approve'),
+    
+    # Order Creation
+    path('orders/create/', views.create_order, name='create_order'),
 ]
-
-
