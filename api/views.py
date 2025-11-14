@@ -27,11 +27,12 @@ def generate_invoice_pdf(order):
     total = 0
 
     for item in order.items.all():
-        line = f"{item.product.name}   x{item.quantity}   = {item.product.price * item.quantity} TL"
+        line_total = item.price * item.quantity
+        line = f"{item.product_name}   x{item.quantity}   = {line_total} TL"
         p.drawString(60, y, line)
         y -= 20
 
-        total += item.product.price * item.quantity
+        total += line_total
 
     # Total fiyat
     p.drawString(50, y - 10, f"Total: {total} TL")
@@ -70,7 +71,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import Order, OrderItem
-from .views import generate_invoice_pdf, send_invoice_email
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

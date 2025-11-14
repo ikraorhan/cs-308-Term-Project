@@ -20,6 +20,9 @@ urlpatterns = [
     path('stock/', views.stock_list, name='stock_list'),
     path('stock/<int:product_id>/', views.stock_update, name='stock_update'),
     
+    # Order Creation (must come before generic orders route)
+    path('orders/create/', views.create_order, name='create_order'),
+
     # Order/Delivery Management
     path('orders/', views.order_list, name='order_list'),
     path('orders/<str:delivery_id>/', views.order_detail, name='order_detail'),
@@ -28,8 +31,5 @@ urlpatterns = [
     # Comment Approval
     path('comments/', views.comment_list, name='comment_list'),
     path('comments/<int:comment_id>/approve/', views.comment_approve, name='comment_approve'),
-    
-    # Order Creation
-    path('orders/create/', views.create_order, name='create_order'),
 ]
 
