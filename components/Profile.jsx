@@ -1,225 +1,64 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Profile.css';
-import { getMockUsers, saveMockUsers } from './authUtils';
-
-const PROFILE_STORAGE_KEY = 'mock_profile_overview';
-
-const DEFAULT_PROFILE = {
-  id: '1',
-  name: 'Admin User',
-  email: 'admin@petstore.com',
-  phone: '+90 555 123 4567',
-  memberSince: '2021-06-12',
-  loyaltyTier: 'Gold',
-  points: 12450,
-  petsSupported: 3,
-  lastLogin: '2025-11-10T18:15:00Z',
-  bio: 'Premium member who loves caring for rescued pets and exploring sustainable products.',
-  addresses: [
-    {
-      id: 'addr-istanbul',
-      label: 'Home Nest',
-      recipient: 'Admin User',
-      phone: '+90 555 123 4567',
-      lines: ['Akasyalı Street No: 21', 'Apt 4'],
-      city: 'Kadıköy, Istanbul',
-      postalCode: '34710',
-      notes: 'Leave at the concierge. Loki (cat) is friendly.',
-      isDefault: true,
-    },
-    {
-      id: 'addr-office',
-      label: 'Studio Loft',
-      recipient: 'Admin User',
-      phone: '+90 532 987 6543',
-      lines: ['Maslak Mah. AOS 55. Street', 'No: 2 / 12'],
-      city: 'Sarıyer, Istanbul',
-      postalCode: '34398',
-      notes: 'Deliver before 5 PM, front desk will sign.',
-      isDefault: false,
-    },
-  ],
-  preferences: {
-    orderReminders: {
-      label: 'Order reminders',
-      description: 'Notify me when it’s time to restock essentials.',
-      enabled: true,
-    },
-    wellnessTips: {
-      label: 'Weekly wellness tips',
-      description: 'Curated care tips tailored to my pets.',
-      enabled: true,
-    },
-    earlyAccess: {
-      label: 'Early access drops',
-      description: 'Get notified about limited collection launches.',
-      enabled: false,
-    },
-    smsUpdates: {
-      label: 'SMS delivery updates',
-      description: 'Shipping progress and delivery confirmations via SMS.',
-      enabled: true,
-    },
-  },
-  recentOrders: [
-    {
-      id: 'ORD-89214',
-      date: '2025-10-29',
-      status: 'Delivered',
-      total: 1189.5,
-      currency: 'TRY',
-      items: [
-        {
-          name: 'Holistic Salmon Kibble',
-          quantity: 2,
-          thumbnail: '/public/images/cat-adult-salmon.jpeg',
-        },
-        {
-          name: 'Organic Catnip Spray',
-          quantity: 1,
-        },
-      ],
-    },
-    {
-      id: 'ORD-88702',
-      date: '2025-09-14',
-      status: 'In transit',
-      total: 749.9,
-      currency: 'TRY',
-      items: [
-        {
-          name: 'Grain-free Puppy Kit',
-          quantity: 1,
-          thumbnail: '/public/images/puppy-chicken.jpeg',
-        },
-        {
-          name: 'Soft Comfort Harness',
-          quantity: 1,
-        },
-      ],
-    },
-    {
-      id: 'ORD-87940',
-      date: '2025-08-03',
-      status: 'Completed',
-      total: 542.0,
-      currency: 'TRY',
-      items: [
-        {
-          name: 'Calming Cat Cave',
-          quantity: 1,
-        },
-        {
-          name: 'Freeze-dried Treat Variety Pack',
-          quantity: 1,
-        },
-      ],
-    },
-  ],
-  careNotes: [
-    {
-      id: 'note-loki',
-      pet: 'Loki',
-      type: 'Cat · 4 years old',
-      text: 'Prefers grain-free food and bamboo litter. Allergic to chicken.',
-    },
-    {
-      id: 'note-mira',
-      pet: 'Mira',
-      type: 'Golden Retriever · 2 years old',
-      text: 'Monthly grooming on the 12th. Needs hip-friendly supplements.',
-    },
-  ],
-  scheduled: [
-    {
-      id: 'sched-vet',
-      title: 'Veterinary check-up',
-      date: '2025-11-24',
-      time: '18:30',
-      location: 'Hale Veterinary Clinic, Moda',
-      notes: 'Bring Loki’s vaccination booklet.',
-    },
-    {
-      id: 'sched-grooming',
-      title: 'Grooming session',
-      date: '2025-12-02',
-      time: '11:00',
-      location: 'Pawsitive Groomers, Nişantaşı',
-      notes: 'Full coat care & nail trim for Mira.',
-    },
-  ],
-  favorites: ['Holistic Salmon Kibble', 'Bamboo Litter Refills', 'Interactive Feather Wand'],
-};
-
-function sanitizeProfile(stored) {
-  if (!stored) return DEFAULT_PROFILE;
-  try {
-    const parsed = JSON.parse(stored);
-    return { ...DEFAULT_PROFILE, ...parsed };
-  } catch (error) {
-    console.warn('Corrupted profile data. Resetting to defaults.', error);
-    return DEFAULT_PROFILE;
-  }
-}
+import { authAPI, clearUserData } from './api';
 
 function Profile() {
   const navigate = useNavigate();
-  const mockUsers = useMemo(() => getMockUsers(), []);
-  const activeMockUser = mockUsers[0] ?? DEFAULT_PROFILE;
-
-  const [profile, setProfile] = useState(() => {
-    const stored = localStorage.getItem(PROFILE_STORAGE_KEY);
-    const merged = sanitizeProfile(stored);
-    return {
-      ...merged,
-      name: activeMockUser.name ?? merged.name,
-      email: activeMockUser.email ?? merged.email,
-    };
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-  }, [profile]);
+    // Check if user is authenticated
+    const isAuthenticated = localStorage.getItem('is_authenticated');
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
 
-  useEffect(() => {
-    const updatedMockUsers = mockUsers.map((user) =>
-      user.id === profile.id
-        ? { ...user, name: profile.name, email: profile.email }
-        : user
-    );
-    saveMockUsers(updatedMockUsers);
-  }, [profile.name, profile.email, profile.id, mockUsers]);
+    // Fetch user data from API
+    fetchUserData();
+  }, [navigate]);
 
-  const handleTogglePreference = (key) => {
-    setProfile((prev) => ({
-      ...prev,
-      preferences: {
-        ...prev.preferences,
-        [key]: {
-          ...prev.preferences[key],
-          enabled: !prev.preferences[key].enabled,
-        },
-      },
-    }));
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await authAPI.getCurrentUser();
+      if (response.data) {
+        setUser(response.data);
+        // Update localStorage with latest user data
+        if (response.data.id) {
+          localStorage.setItem('user_id', response.data.id);
+          localStorage.setItem('user_email', response.data.email || '');
+          localStorage.setItem('user_name', `${response.data.first_name || ''} ${response.data.last_name || ''}`.trim() || response.data.username);
+          localStorage.setItem('user_username', response.data.username);
+          localStorage.setItem('is_authenticated', 'true');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+      setError('Failed to load profile. Please try again.');
+      // If unauthorized, redirect to login
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        clearUserData();
+        navigate('/login');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSetDefaultAddress = (id) => {
-    setProfile((prev) => ({
-      ...prev,
-      addresses: prev.addresses.map((address) => ({
-        ...address,
-        isDefault: address.id === id,
-      })),
-    }));
-  };
-
-  const handleSignOut = () => {
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_name');
-    localStorage.removeItem('user_id');
-    localStorage.removeItem('is_authenticated');
-    navigate('/login');
+  const handleSignOut = async () => {
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      clearUserData();
+      navigate('/login');
+    }
   };
 
   const formatDate = (value) => {
@@ -234,199 +73,216 @@ function Profile() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="profile-page">
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="profile-page">
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <p className="error-message">{error}</p>
+          <button onClick={fetchUserData}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="profile-page">
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <p>No user data available. Please log in again.</p>
+          <button onClick={() => navigate('/login')}>Go to Login</button>
+        </div>
+      </div>
+    );
+  }
+
+  const isAdmin = user.is_admin || user.is_staff || user.is_superuser;
+  const profile = user.profile || {};
+  const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username;
+
+  // Admin Profile View
+  if (isAdmin) {
+    return (
+      <div className="profile-page">
+        <section className="profile-hero">
+          <div className="profile-identity">
+            <div className="avatar-circle">
+              <span role="img" aria-label="Admin">👑</span>
+            </div>
+            <div>
+              <h1>{fullName} (Admin)</h1>
+              <p className="profile-hero-subtitle">Administrator Account</p>
+              <div className="profile-contact-line">
+                <span>{user.email}</span>
+                {profile.phone && (
+                  <>
+                    <span>•</span>
+                    <span>{profile.phone}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="profile-badges">
+            <div className="badge">
+              <span className="badge-label">Role</span>
+              <span className="badge-value">Admin</span>
+              <small>System Administrator</small>
+            </div>
+            <div className="badge">
+              <span className="badge-label">Member Since</span>
+              <span className="badge-value">{formatDate(user.date_joined)}</span>
+              <small>Account Created</small>
+            </div>
+            <div className="badge">
+              <span className="badge-label">Username</span>
+              <span className="badge-value">{user.username}</span>
+              <small>Login ID</small>
+            </div>
+          </div>
+        </section>
+
+        <section className="profile-grid">
+          <article className="profile-card">
+            <header>
+              <h2>Admin Information</h2>
+              <p>Administrator account details and access information.</p>
+            </header>
+            <div style={{ padding: '20px' }}>
+              <p><strong>Email:</strong> {user.email}</p>
+              <p><strong>Username:</strong> {user.username}</p>
+              <p><strong>First Name:</strong> {user.first_name || 'Not set'}</p>
+              <p><strong>Last Name:</strong> {user.last_name || 'Not set'}</p>
+              <p><strong>Account Created:</strong> {formatDate(user.date_joined)}</p>
+              {user.is_superuser && <p><strong>Superuser:</strong> Yes</p>}
+              {user.is_staff && <p><strong>Staff:</strong> Yes</p>}
+            </div>
+          </article>
+
+          <article className="profile-card">
+            <header>
+              <h2>Admin Actions</h2>
+              <p>Quick access to administrative functions.</p>
+            </header>
+            <div style={{ padding: '20px' }}>
+              <button 
+                type="button" 
+                className="primary-button"
+                onClick={() => window.location.href = '/product-manager/dashboard'}
+                style={{ marginBottom: '10px', width: '100%' }}
+              >
+                Go to Product Manager Dashboard
+              </button>
+              <button 
+                type="button" 
+                className="primary-button"
+                onClick={() => window.location.href = '/admin'}
+                style={{ marginBottom: '10px', width: '100%' }}
+              >
+                Go to Django Admin
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <section className="profile-footer">
+          <button type="button" className="signout-button" onClick={handleSignOut}>
+            Sign out
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  // Regular User Profile View (with empty fields by default)
   return (
     <div className="profile-page">
       <section className="profile-hero">
         <div className="profile-identity">
           <div className="avatar-circle">
-            <span role="img" aria-label="Paw print">
-              🐾
-            </span>
+            <span role="img" aria-label="Paw print">🐾</span>
           </div>
           <div>
-            <h1>{profile.name}</h1>
-            <p className="profile-hero-subtitle">{profile.bio}</p>
+            <h1>{fullName}</h1>
+            <p className="profile-hero-subtitle">{profile.bio || 'Welcome to your profile! Fill in your information to get started.'}</p>
             <div className="profile-contact-line">
-              <span>{profile.email}</span>
-              <span>•</span>
-              <span>{profile.phone}</span>
+              <span>{user.email}</span>
+              {profile.phone && (
+                <>
+                  <span>•</span>
+                  <span>{profile.phone}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
         <div className="profile-badges">
           <div className="badge">
             <span className="badge-label">Membership</span>
-            <span className="badge-value">{profile.loyaltyTier}</span>
-            <small>Joined: {formatDate(profile.memberSince)}</small>
+            <span className="badge-value">{profile.loyalty_tier || 'Standard'}</span>
+            <small>Member Since: {formatDate(user.date_joined)}</small>
           </div>
           <div className="badge">
             <span className="badge-label">Loyalty points</span>
-            <span className="badge-value">{profile.points.toLocaleString('en-US')}</span>
+            <span className="badge-value">{profile.loyalty_points?.toLocaleString('en-US') || '0'}</span>
             <small>Pet Care Club</small>
           </div>
           <div className="badge">
             <span className="badge-label">Pets supported</span>
-            <span className="badge-value">{profile.petsSupported}</span>
+            <span className="badge-value">{profile.pets_supported || '0'}</span>
             <small>Best friend</small>
           </div>
         </div>
       </section>
 
       <section className="profile-grid">
-        <article className="profile-card addresses-card">
+        <article className="profile-card">
           <header>
-            <h2>Delivery addresses</h2>
-            <p>Manage where your packages go and set your default drop point.</p>
+            <h2>Personal Information</h2>
+            <p>Your account details and contact information.</p>
           </header>
-          <div className="address-list">
-            {profile.addresses.map((address) => (
-              <div
-                key={address.id}
-                className={`address-card ${address.isDefault ? 'is-default' : ''}`}
-              >
-                <div className="address-header">
-                  <span className="address-label">{address.label}</span>
-                  {address.isDefault && <span className="address-pill">Default</span>}
-                </div>
-                <p className="address-recipient">{address.recipient}</p>
-                <p className="address-lines">
-                  {[...address.lines, `${address.postalCode} ${address.city}`].join(', ')}
-                </p>
-                <p className="address-phone">{address.phone}</p>
-                <p className="address-notes">{address.notes}</p>
-                {!address.isDefault && (
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => handleSetDefaultAddress(address.id)}
-                  >
-                    Set as default
-                  </button>
-                )}
-              </div>
-            ))}
+          <div style={{ padding: '20px' }}>
+            <p><strong>Email:</strong> {user.email || 'Not set'}</p>
+            <p><strong>Phone:</strong> {profile.phone || 'Not set'}</p>
+            <p><strong>First Name:</strong> {user.first_name || 'Not set'}</p>
+            <p><strong>Last Name:</strong> {user.last_name || 'Not set'}</p>
+            <p><strong>Bio:</strong> {profile.bio || 'No bio added yet'}</p>
+            <p><strong>Member Since:</strong> {formatDate(user.date_joined)}</p>
           </div>
         </article>
 
-        <article className="profile-card orders-card">
+        <article className="profile-card">
           <header>
-            <h2>Recent orders</h2>
-            <p>Track deliveries and reorder your favourites in one tap.</p>
+            <h2>Loyalty Program</h2>
+            <p>Your loyalty tier and points information.</p>
           </header>
-          <div className="order-list">
-            {profile.recentOrders.map((order) => (
-              <div key={order.id} className="order-item">
-                <div className="order-meta">
-                  <span className="order-id">{order.id}</span>
-                  <span className={`status-chip status-${order.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {order.status}
-                  </span>
-                </div>
-                <p className="order-date">{formatDate(order.date)}</p>
-                <p className="order-total">
-                  {order.total.toLocaleString('tr-TR', {
-                    style: 'currency',
-                    currency: order.currency,
-                  })}
-                </p>
-                <ul className="order-products">
-                  {order.items.map((item, index) => (
-                    <li key={`${order.id}-${index}`}>
-                      {item.name}
-                      <span className="quantity">×{item.quantity}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="order-actions">
-                  <button type="button" className="primary-link">
-                    View order
-                  </button>
-                  <button type="button" className="ghost-button">
-                    Buy again
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div style={{ padding: '20px' }}>
+            <p><strong>Tier:</strong> {profile.loyalty_tier || 'Standard'}</p>
+            <p><strong>Points:</strong> {profile.loyalty_points || 0}</p>
+            <p><strong>Pets Supported:</strong> {profile.pets_supported || 0}</p>
           </div>
         </article>
 
-        <article className="profile-card preferences-card">
+        <article className="profile-card">
           <header>
-            <h2>Preferences & notifications</h2>
-            <p>Fine-tune the reminders and content we prepare just for you.</p>
+            <h2>Account Settings</h2>
+            <p>Manage your account preferences.</p>
           </header>
-          <ul className="preference-list">
-            {Object.entries(profile.preferences).map(([key, preference]) => (
-              <li key={key} className="preference-item">
-                <div>
-                  <p className="preference-label">{preference.label}</p>
-                  <p className="preference-description">{preference.description}</p>
-                </div>
-                <button
-                  type="button"
-                  className={`switch ${preference.enabled ? 'is-on' : ''}`}
-                  onClick={() => handleTogglePreference(key)}
-                >
-                  <span className="switch-handle" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="profile-card care-card">
-          <header>
-            <h2>Care notes</h2>
-            <p>Keep quick notes for your vet and groomer to stay in sync.</p>
-          </header>
-          <ul className="care-note-list">
-            {profile.careNotes.map((note) => (
-              <li key={note.id} className="care-note">
-                <div className="care-note-header">
-                  <span className="care-note-pet">{note.pet}</span>
-                  <span className="care-note-type">{note.type}</span>
-                </div>
-                <p>{note.text}</p>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="profile-card schedule-card">
-          <header>
-            <h2>Upcoming appointments</h2>
-            <p>Stay ahead of clinic visits and pamper sessions.</p>
-          </header>
-          <ul className="schedule-list">
-            {profile.scheduled.map((item) => (
-              <li key={item.id} className="schedule-item">
-                <div>
-                  <p className="schedule-date">
-                    {formatDate(item.date)} · {item.time}
-                  </p>
-                  <p className="schedule-title">{item.title}</p>
-                  <p className="schedule-location">{item.location}</p>
-                </div>
-                <p className="schedule-notes">{item.notes}</p>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="profile-card favorites-card">
-          <header>
-            <h2>Favorite products</h2>
-            <p>Access your most-loved picks without searching.</p>
-          </header>
-          <div className="favorites-chip-row">
-            {profile.favorites.map((favorite) => (
-              <span key={favorite} className="favorite-chip">
-                {favorite}
-              </span>
-            ))}
+          <div style={{ padding: '20px' }}>
+            <p>Profile editing coming soon...</p>
           </div>
         </article>
       </section>
+
       <section className="profile-footer">
         <button type="button" className="signout-button" onClick={handleSignOut}>
           Sign out
@@ -437,5 +293,3 @@ function Profile() {
 }
 
 export default Profile;
-
-

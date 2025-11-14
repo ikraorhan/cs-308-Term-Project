@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'api',
     'product_manager_api',
     'rest_framework',
+    'corsheaders',  # CORS support for React frontend
 ]
 
 TEMPLATES = [
@@ -71,6 +72,8 @@ ALLOWED_HOSTS = []
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware (should be early)
+    'api.middleware.DisableCSRFForAPI',  # Disable CSRF for API endpoints
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -144,5 +147,57 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    # Note: Default permission is IsAuthenticated, but individual views override with @permission_classes
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ],
+    # Disable CSRF for API endpoints (handled by our middleware)
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+}
+
+# CSRF settings for API endpoints
+# Exempt API views from CSRF (since we're using DRF with session auth)
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
+# CORS Configuration (for React frontend)
+# Install: pip install django-cors-headers
+# Then add 'corsheaders' to INSTALLED_APPS and 'corsheaders.middleware.CorsMiddleware' to MIDDLEWARE
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite default port
+    "http://localhost:3000",  # Alternative React port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# Email Configuration
+# For development, use console backend (emails print to console)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# For production, configure SMTP (uncomment and fill in your details):
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'  # or your SMTP server
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password'
+# DEFAULT_FROM_EMAIL = 'your-email@gmail.com'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
