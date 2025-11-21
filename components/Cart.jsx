@@ -51,56 +51,16 @@ function Cart() {
     setTotal(totalPrice);
   };
 
-<<<<<<< Updated upstream
-  const updateQuantity = (id, newQuantity) => {
-    if (newQuantity < 1) {
-      removeItem(id);
-      return;
-=======
   const calculateTotalQuantity = () => {
     return cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
   };
 
-  const subtotal = calculateTotal();
   const totalQuantity = calculateTotalQuantity();
-  const shipping = 0;
-  const total = subtotal + shipping;
 
-  // 🔹 EKLEME: Invoice için vergi breakdown'ı hesapla
-  const taxRate = 0.18;
-  const invoiceTotal = total; // Kullanıcının ödediği miktar
-  const invoiceSubtotal = invoiceTotal / (1 + taxRate); // KDV hariç
-  const invoiceTax = invoiceTotal - invoiceSubtotal;    // KDV miktarı
-
-  // 🔹 EKLEME: Invoice'da kullanılacak sipariş objesi
-  const invoiceOrder = {
-    id: orderId || "TEMP-" + Date.now(),
-    date: new Date().toISOString().slice(0, 10),
-    customerName: userName || userEmail || "Guest",
-    paymentMethod: "Credit Card",
-    address: {
-      line1: "Sabancı University",
-      line2: "",
-      city: "Istanbul",
-      zip: "34956",
-      country: "Turkey",
-    },
-    items: cartItems.map((item) => ({
-      name: item.name,
-      quantity: item.quantity || 1,
-      price: item.price || 0,
-    })),
-    subtotal: invoiceSubtotal,
-    tax: invoiceTax,
-    total: invoiceTotal,
-  };
-
-  const handleCheckout = () => {
-    if (isAuthenticated) {
-      setShowPayment(true);
-    } else {
-      navigate("/login");
->>>>>>> Stashed changes
+  const updateQuantity = (id, newQuantity) => {
+    if (newQuantity < 1) {
+      removeItem(id);
+      return;
     }
     const updatedItems = cartItems.map((item) =>
       item.id === id ? { ...item, quantity: newQuantity } : item
@@ -115,6 +75,35 @@ function Cart() {
     setCartItems(updatedItems);
     localStorage.setItem('cart_items', JSON.stringify(updatedItems));
     calculateTotal(updatedItems);
+  };
+
+  const taxRate = 0.18;
+  const shipping = 0; // şu an için ücretsiz
+  const invoiceTotal = total + shipping;        // Kullanıcının ödediği toplam miktar
+  const invoiceSubtotal = invoiceTotal / (1 + taxRate); // KDV hariç
+  const invoiceTax = invoiceTotal - invoiceSubtotal;    // KDV miktarı
+
+  const invoiceOrder = {
+    id: orderId || 'PENDING',
+    date: new Date().toISOString().slice(0, 10),
+    customerName: userName || userEmail || 'Guest',
+    paymentMethod: 'Credit Card',
+    address: {
+      line1: 'Sabancı University',
+      line2: '',
+      city: 'Istanbul',
+      zip: '34956',
+      country: 'Turkey',
+    },
+    items: cartItems.map((item) => ({
+      name: item.name,
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+    })),
+    subtotal: invoiceSubtotal,
+    tax: invoiceTax,
+    total: invoiceTotal,
+    totalQuantity,
   };
 
   // Open payment modal
@@ -213,7 +202,7 @@ function Cart() {
             </div>
             <div className="summary-row total-row">
               <span>Total:</span>
-              <strong>₺{total.toFixed(2)}</strong>
+              <strong>₺{(total + shipping).toFixed(2)}</strong>
             </div>
 
             <button onClick={handleCheckout} className="checkout-button">
@@ -231,19 +220,15 @@ function Cart() {
 
       {showPayment && (
         <PaymentMockFlow
-          amount={total}
+          amount={invoiceTotal}
           currency="TRY"
           onSuccess={handlePaymentSuccess}
           onCancel={handlePaymentCancel}
-          // 🔹 EKLEME: Invoice için sipariş datasını gönder
           order={invoiceOrder}
         />
       )}
     </div>
   );
 }
-<<<<<<< Updated upstream
 
 export default Cart;
-=======
->>>>>>> Stashed changes
