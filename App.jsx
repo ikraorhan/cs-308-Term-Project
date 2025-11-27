@@ -14,6 +14,8 @@ import Profile from './components/Profile.jsx';
 import CommentApproval from './components/ProductManager/CommentApproval.jsx';
 import { CartProvider } from './context/CartContext';
 import Notification from './components/Notification';
+import OrderHistory from "./components/OrderHistory";
+
 import './App.css';
 
 function App() {
@@ -35,6 +37,7 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/about" element={<About />} />
             <Route path="/product-manager/comments" element={<CommentApproval />} />
+            <Route path="/order-history" element={<OrderHistory />} />
           </Routes>
         </div>
       </Router>
