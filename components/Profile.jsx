@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 import { getMockUsers, saveMockUsers } from './authUtils';
+import { authAPI } from './api';
 
 const PROFILE_STORAGE_KEY = 'mock_profile_overview';
 
@@ -178,6 +179,63 @@ function Profile() {
     };
   });
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Fetch profile from backend on mount
+  useEffect(() => {
+    loadProfileFromBackend();
+  }, []);
+
+  const loadProfileFromBackend = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await authAPI.getCurrentUser();
+      const userData = response.data;
+      
+      if (userData) {
+        const profileData = userData.profile || {};
+        const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username;
+        
+        // Merge backend data with local defaults
+        setProfile(prev => ({
+          ...prev,
+          id: String(userData.id),
+          name: fullName,
+          email: userData.email || prev.email,
+          phone: profileData.phone || prev.phone,
+          bio: profileData.bio || prev.bio,
+          loyaltyTier: profileData.loyalty_tier || prev.loyaltyTier || 'Standard',
+          points: profileData.loyalty_points || prev.points || 0,
+          petsSupported: profileData.pets_supported || prev.petsSupported || 0,
+          memberSince: userData.date_joined ? new Date(userData.date_joined).toISOString().split('T')[0] : prev.memberSince,
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to load profile from backend:', err);
+      // Continue with local data if backend fails
+      setError('Could not load profile from server. Using local data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveProfileToBackend = async (updatedFields) => {
+    try {
+      setSaving(true);
+      await authAPI.updateProfile(updatedFields);
+      await loadProfileFromBackend(); // Reload to get updated data
+    } catch (err) {
+      console.error('Failed to save profile to backend:', err);
+      setError('Failed to save profile changes. Please try again.');
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
   }, [profile]);
@@ -202,6 +260,7 @@ function Profile() {
         },
       },
     }));
+    // Note: Preferences are stored locally only for now
   };
 
   const handleSetDefaultAddress = (id) => {
@@ -212,6 +271,29 @@ function Profile() {
         isDefault: address.id === id,
       })),
     }));
+    // Note: Addresses are stored locally only for now
+  };
+
+  const handleUpdateProfile = async (field, value) => {
+    const updatedProfile = { ...profile, [field]: value };
+    setProfile(updatedProfile);
+    
+    // Map frontend fields to backend fields
+    const backendFields = {
+      phone: 'phone',
+      bio: 'bio',
+      loyaltyTier: 'loyalty_tier',
+      points: 'loyalty_points',
+      petsSupported: 'pets_supported',
+    };
+    
+    if (backendFields[field]) {
+      try {
+        await saveProfileToBackend({ [backendFields[field]]: value });
+      } catch (err) {
+        // Error already handled in saveProfileToBackend
+      }
+    }
   };
 
   const handleSignOut = () => {
@@ -234,8 +316,30 @@ function Profile() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="profile-page">
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="profile-page">
+      {error && (
+        <div style={{ 
+          padding: '1rem', 
+          margin: '1rem', 
+          backgroundColor: '#fee', 
+          border: '1px solid #fcc',
+          borderRadius: '4px',
+          color: '#c33'
+        }}>
+          {error}
+        </div>
+      )}
       <section className="profile-hero">
         <div className="profile-identity">
           <div className="avatar-circle">
