@@ -396,13 +396,14 @@ def order_update_status(request, delivery_id):
     )
 
 # Comment Approval
-# Import Review model
+# Import Review and Order models
 try:
-    from .models import Review
+    from .models import Review, Order
     USE_DATABASE = True
 except ImportError:
     USE_DATABASE = False
     Review = None
+    Order = None
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -708,7 +709,7 @@ def delivery_dashboard_stats(request):
 # Create Order (Frontend Checkout)
 # =============================
 from api.views import send_invoice_email
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 
 @api_view(['POST'])
@@ -730,10 +731,61 @@ def create_order(request):
 
     # Create delivery/order id
     delivery_id = f"DEL-{uuid.uuid4().hex[:6].upper()}"
+    customer_id = f"CUST-{uuid.uuid4().hex[:6].upper()}"
+    order_date = date.today()
 
+    # Try to save to database first
+    if USE_DATABASE and Order:
+        try:
+            order = Order.objects.create(
+                delivery_id=delivery_id,
+                customer_id=customer_id,
+                customer_name=data["customer_name"],
+                customer_email=data["customer_email"],
+                product_id=data.get("product_id", 0),
+                product_name=data["product_name"],
+                quantity=data["quantity"],
+                total_price=data["total_price"],
+                delivery_address=data["delivery_address"],
+                status="processing",
+                order_date=order_date,
+                delivery_date=None
+            )
+            
+            # Convert to dict for response
+            new_order = {
+                "delivery_id": order.delivery_id,
+                "customer_id": order.customer_id,
+                "customer_name": order.customer_name,
+                "customer_email": order.customer_email,
+                "product_id": order.product_id,
+                "product_name": order.product_name,
+                "quantity": order.quantity,
+                "total_price": float(order.total_price),
+                "delivery_address": order.delivery_address,
+                "status": order.status,
+                "order_date": order.order_date.strftime("%Y-%m-%d") if order.order_date else None,
+                "delivery_date": order.delivery_date.strftime("%Y-%m-%d") if order.delivery_date else None,
+            }
+            
+            # Send email invoice
+            try:
+                send_invoice_email(new_order)
+            except Exception as e:
+                print("Email error:", e)
+            
+            return Response(
+                {"message": "Order created successfully", "order": new_order},
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            print(f"Database error creating order: {e}")
+            # Fall through to mock data
+    
+    # Fallback to mock data
     new_order = {
         "delivery_id": delivery_id,
-        "customer_id": f"CUST-{uuid.uuid4().hex[:6].upper()}",
+        "customer_id": customer_id,
         "customer_name": data["customer_name"],
         "customer_email": data["customer_email"],
         "product_id": data.get("product_id", None),
@@ -742,7 +794,7 @@ def create_order(request):
         "total_price": data["total_price"],
         "delivery_address": data["delivery_address"],
         "status": "processing",
-        "order_date": datetime.now().strftime("%Y-%m-%d"),
+        "order_date": order_date.strftime("%Y-%m-%d"),
         "delivery_date": None
     }
 
@@ -759,3 +811,54 @@ def create_order(request):
         {"message": "Order created successfully", "order": new_order},
         status=status.HTTP_201_CREATED
     )
+
+# =============================
+# Order History (User Orders)
+# =============================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def user_order_history(request):
+    """Get order history for the current user by email"""
+    user_email = request.query_params.get('email')
+    
+    if not user_email:
+        return Response(
+            {"error": "Email parameter is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Try to get orders from database first
+    if USE_DATABASE and Order:
+        try:
+            orders = Order.objects.filter(customer_email=user_email).order_by('-order_date', '-created_at')
+            orders_data = [{
+                'delivery_id': order.delivery_id,
+                'customer_id': order.customer_id,
+                'customer_name': order.customer_name,
+                'customer_email': order.customer_email,
+                'product_id': order.product_id,
+                'product_name': order.product_name,
+                'quantity': order.quantity,
+                'total_price': float(order.total_price),
+                'delivery_address': order.delivery_address,
+                'status': order.status,
+                'order_date': order.order_date.strftime('%Y-%m-%d') if order.order_date else None,
+                'delivery_date': order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else None,
+                'created_at': order.created_at.isoformat() if order.created_at else None,
+            } for order in orders]
+            
+            return Response({
+                'orders': orders_data,
+                'count': len(orders_data)
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Database error: {e}")
+            # Fall through to mock data
+    
+    # Fallback to mock data
+    user_orders = [o for o in MOCK_ORDERS if o.get('customer_email', '').lower() == user_email.lower()]
+    
+    return Response({
+        'orders': user_orders,
+        'count': len(user_orders)
+    }, status=status.HTTP_200_OK)
