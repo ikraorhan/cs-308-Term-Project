@@ -13,8 +13,8 @@ function Cart() {
   const userEmail = localStorage.getItem('user_email');
   const userName = localStorage.getItem('user_name');
   
-  // Cart data (from localStorage)
-  const [cartItems, setCartItems] = useState([]);
+  // Use CartContext for cart data
+  const { cartItems, updateQuantity: contextUpdateQuantity, removeFromCart: contextRemoveFromCart } = useCart();
   const [total, setTotal] = useState(0);
 
   // Payment flow state
@@ -22,36 +22,13 @@ function Cart() {
   const [orderId, setOrderId] = useState(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-
-    // Load cart data
-    const savedCart = localStorage.getItem('cart_items');
-    if (savedCart) {
-      const items = JSON.parse(savedCart);
-      setCartItems(items);
-      calculateTotal(items);
-    } else {
-      // Example cart data (fallback)
-      const mockCart = [
-        { id: 1, name: 'Dog Food', price: 150, quantity: 2, image: '🐕' },
-        { id: 2, name: 'Cat Litter', price: 80, quantity: 1, image: '🐱' },
-      ];
-      setCartItems(mockCart);
-      localStorage.setItem('cart_items', JSON.stringify(mockCart));
-      calculateTotal(mockCart);
-    }
-  }, [isAuthenticated, navigate]);
-
-  const calculateTotal = (items) => {
-    const totalPrice = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
+    // Calculate total when cart items change
+    const totalPrice = cartItems.reduce(
+      (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
       0
     );
     setTotal(totalPrice);
-  };
+  }, [cartItems]);
 
   const calculateTotalQuantity = () => {
     return cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
@@ -64,19 +41,11 @@ function Cart() {
       removeItem(id);
       return;
     }
-    const updatedItems = cartItems.map((item) =>
-      item.id === id ? { ...item, quantity: newQuantity } : item
-    );
-    setCartItems(updatedItems);
-    localStorage.setItem('cart_items', JSON.stringify(updatedItems));
-    calculateTotal(updatedItems);
+    contextUpdateQuantity(id, newQuantity);
   };
 
   const removeItem = (id) => {
-    const updatedItems = cartItems.filter((item) => item.id !== id);
-    setCartItems(updatedItems);
-    localStorage.setItem('cart_items', JSON.stringify(updatedItems));
-    calculateTotal(updatedItems);
+    contextRemoveFromCart(id);
   };
 
   const taxRate = 0.18;
@@ -108,8 +77,13 @@ function Cart() {
     totalQuantity,
   };
 
-  // Open payment modal
+  // Open payment modal - requires login
   const handleCheckout = () => {
+    if (!isAuthenticated) {
+      alert('Please login to proceed with checkout.');
+      navigate('/login');
+      return;
+    }
     setShowPayment(true);
   };
 
@@ -147,15 +121,15 @@ function Cart() {
     setShowPayment(false);
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div className="cart-container">
       <div className="cart-header">
         <h1>My Cart 🛒</h1>
-        <p>Hello, {userName || userEmail}!</p>
+        {isAuthenticated ? (
+          <p>Hello, {userName || userEmail}!</p>
+        ) : (
+          <p>You are browsing as a guest. <button onClick={() => navigate('/login')} className="link-button" style={{background: 'none', border: 'none', color: 'blue', textDecoration: 'underline', cursor: 'pointer'}}>Login</button> to checkout.</p>
+        )}
       </div>
 
       {cartItems.length === 0 ? (
@@ -176,7 +150,18 @@ function Cart() {
             {cartItems.map((item) => (
               <div key={item.id} className="cart-item">
                 <div className="cart-item-image">
-                  <span className="item-emoji">{item.image}</span>
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url} 
+                      alt={item.name}
+                      style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }}
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/80x80?text=Product';
+                      }}
+                    />
+                  ) : (
+                    <span className="item-emoji">🛍️</span>
+                  )}
                 </div>
                 <div className="cart-item-details">
                   <h3>{item.name}</h3>

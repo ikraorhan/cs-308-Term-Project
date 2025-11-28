@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productsAPI } from '../product_manager_api';
+import { useCart } from '../context/CartContext';
 import { 
   hasDeliveredProduct, 
   hasReviewedProduct,
@@ -17,6 +18,7 @@ import './ProductDetail.css';
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -287,6 +289,30 @@ function ProductDetail() {
                   </span>
                 </div>
               )}
+            </div>
+            
+            <div className="product-actions">
+              <button
+                className="add-to-cart-button-detail"
+                disabled={product.quantity_in_stock === 0}
+                onClick={() => {
+                  if (product.quantity_in_stock === 0) return;
+                  addToCart(product);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  backgroundColor: product.quantity_in_stock === 0 ? '#ccc' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: product.quantity_in_stock === 0 ? 'not-allowed' : 'pointer',
+                  marginTop: '20px'
+                }}
+              >
+                {product.quantity_in_stock === 0 ? 'Out of Stock' : 'Add to Cart 🛒'}
+              </button>
             </div>
           </div>
         </div>
