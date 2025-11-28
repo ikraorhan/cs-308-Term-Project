@@ -4,7 +4,14 @@ import "./PaymentMockFlow.css";
 // 🔹 EKLEME: Invoice PDF için util
 import { generateInvoicePdf } from "./invoiceUtils";
 
-export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = [], onSuccess, onCancel }) {
+export default function PaymentMockFlow({
+  amount,
+  currency = "TRY",
+  cartItems = [],
+  order = null,
+  onSuccess,
+  onCancel,
+}) {
   const navigate = useNavigate();
   const [step, setStep] = useState("card"); // "card" | "3ds" | "success"
   const [cardName, setCardName] = useState("");
