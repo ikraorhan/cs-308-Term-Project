@@ -140,11 +140,27 @@ function Cart() {
       });
       console.log('Order saved:', order);
     }
+    
+    // Clear cart after successful payment
+    setCartItems([]);
+    localStorage.removeItem('cart_items');
+    
+    // Modal'ı kapat ve profile'a yönlendir
+    setShowPayment(false);
+    // Profile'a yönlendir (PaymentMockFlow'daki close butonu da navigate yapacak ama burada da yapalım)
+    setTimeout(() => {
+      navigate('/profile');
+    }, 100);
   };
 
   // When user closes payment modal (X or Continue)
   const handlePaymentCancel = () => {
-    setShowPayment(false);
+    // Eğer orderId varsa (yani ödeme başarılı olduysa), profile'a yönlendir
+    if (orderId) {
+      navigate('/profile');
+    } else {
+      setShowPayment(false);
+    }
   };
 
   if (!isAuthenticated) {

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 import { getMockUsers, saveMockUsers } from './authUtils';
-import { authAPI } from './api';
+import { authAPI, productManagerAPI } from './api';
 
 const PROFILE_STORAGE_KEY = 'mock_profile_overview';
 
@@ -63,61 +63,7 @@ const DEFAULT_PROFILE = {
       enabled: true,
     },
   },
-  recentOrders: [
-    {
-      id: 'ORD-89214',
-      date: '2025-10-29',
-      status: 'Delivered',
-      total: 1189.5,
-      currency: 'TRY',
-      items: [
-        {
-          name: 'Holistic Salmon Kibble',
-          quantity: 2,
-          thumbnail: '/public/images/cat-adult-salmon.jpeg',
-        },
-        {
-          name: 'Organic Catnip Spray',
-          quantity: 1,
-        },
-      ],
-    },
-    {
-      id: 'ORD-88702',
-      date: '2025-09-14',
-      status: 'In transit',
-      total: 749.9,
-      currency: 'TRY',
-      items: [
-        {
-          name: 'Grain-free Puppy Kit',
-          quantity: 1,
-          thumbnail: '/public/images/puppy-chicken.jpeg',
-        },
-        {
-          name: 'Soft Comfort Harness',
-          quantity: 1,
-        },
-      ],
-    },
-    {
-      id: 'ORD-87940',
-      date: '2025-08-03',
-      status: 'Completed',
-      total: 542.0,
-      currency: 'TRY',
-      items: [
-        {
-          name: 'Calming Cat Cave',
-          quantity: 1,
-        },
-        {
-          name: 'Freeze-dried Treat Variety Pack',
-          quantity: 1,
-        },
-      ],
-    },
-  ],
+  recentOrders: [],
   careNotes: [
     {
       id: 'note-loki',
@@ -182,10 +128,13 @@ function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   // Fetch profile from backend on mount
   useEffect(() => {
     loadProfileFromBackend();
+    loadRecentOrders();
   }, []);
 
   const loadProfileFromBackend = async () => {
@@ -220,6 +169,58 @@ function Profile() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRecentOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      // Önce localStorage'dan email al (order'lar bu email ile kaydediliyor)
+      const storedEmail = localStorage.getItem('user_email');
+      if (!storedEmail) {
+        // Eğer localStorage'da yoksa backend'den al
+        try {
+          const response = await authAPI.getCurrentUser();
+          if (response.data && response.data.email) {
+            const email = response.data.email;
+            const orderResponse = await productManagerAPI.getOrderHistory(email);
+            if (orderResponse.data && orderResponse.data.orders) {
+              const orders = orderResponse.data.orders.slice(0, 3); // En son 3 siparişi al
+              setRecentOrders(transformOrders(orders));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to get user email:', err);
+        }
+      } else {
+        const orderResponse = await productManagerAPI.getOrderHistory(storedEmail);
+        if (orderResponse.data && orderResponse.data.orders) {
+          const orders = orderResponse.data.orders.slice(0, 3); // En son 3 siparişi al
+          setRecentOrders(transformOrders(orders));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load recent orders:', err);
+      // Hata durumunda boş array bırak
+      setRecentOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const transformOrders = (orders) => {
+    return orders.map(order => ({
+      id: order.delivery_id || order.id,
+      date: order.order_date || order.date,
+      status: order.status === 'processing' ? 'Processing' : 
+              order.status === 'in-transit' ? 'In transit' : 
+              order.status === 'delivered' ? 'Delivered' : order.status,
+      total: parseFloat(order.total_price) || 0,
+      currency: 'TRY',
+      items: [{
+        name: order.product_name || 'Product',
+        quantity: order.quantity || 1,
+      }],
+    }));
   };
 
   const saveProfileToBackend = async (updatedFields) => {
@@ -414,43 +415,62 @@ function Profile() {
 
         <article className="profile-card orders-card">
           <header>
-            <h2>Recent orders</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <h2>Recent orders</h2>
+              <button
+                type="button"
+                className="view-all-orders-button"
+                onClick={() => navigate('/order-history')}
+              >
+                View Order History
+              </button>
+            </div>
             <p>Track deliveries and reorder your favourites in one tap.</p>
           </header>
           <div className="order-list">
-            {profile.recentOrders.map((order) => (
-              <div key={order.id} className="order-item">
-                <div className="order-meta">
-                  <span className="order-id">{order.id}</span>
-                  <span className={`status-chip status-${order.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {order.status}
-                  </span>
-                </div>
-                <p className="order-date">{formatDate(order.date)}</p>
-                <p className="order-total">
-                  {order.total.toLocaleString('tr-TR', {
-                    style: 'currency',
-                    currency: order.currency,
-                  })}
-                </p>
-                <ul className="order-products">
-                  {order.items.map((item, index) => (
-                    <li key={`${order.id}-${index}`}>
-                      {item.name}
-                      <span className="quantity">×{item.quantity}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="order-actions">
-                  <button type="button" className="primary-link">
-                    View order
-                  </button>
-                  <button type="button" className="ghost-button">
-                    Buy again
-                  </button>
-                </div>
+            {ordersLoading ? (
+              <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+                Loading orders...
               </div>
-            ))}
+            ) : recentOrders.length === 0 ? (
+              <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+                No recent orders found.
+              </div>
+            ) : (
+              recentOrders.map((order) => (
+                <div key={order.id} className="order-item">
+                  <div className="order-meta">
+                    <span className="order-id">{order.id}</span>
+                    <span className={`status-chip status-${order.status.toLowerCase().replace(/\s+/g, '-')}`}>
+                      {order.status}
+                    </span>
+                  </div>
+                  <p className="order-date">{formatDate(order.date)}</p>
+                  <p className="order-total">
+                    {order.total.toLocaleString('tr-TR', {
+                      style: 'currency',
+                      currency: order.currency,
+                    })}
+                  </p>
+                  <ul className="order-products">
+                    {order.items.map((item, index) => (
+                      <li key={`${order.id}-${index}`}>
+                        {item.name}
+                        <span className="quantity">×{item.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="order-actions">
+                    <button type="button" className="primary-link">
+                      View order
+                    </button>
+                    <button type="button" className="ghost-button">
+                      Buy again
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </article>
 

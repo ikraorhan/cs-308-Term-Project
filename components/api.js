@@ -450,5 +450,13 @@ export const productManagerAPI = {
       body: JSON.stringify(reviewData),
     });
   },
+
+  /**
+   * Get order history for a user
+   * @param {string} email - User email
+   */
+  async getOrderHistory(email) {
+    return productManagerRequest(`/orders/history/?email=${encodeURIComponent(email)}`);
+  },
 };
 
