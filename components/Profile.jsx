@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './Profile.css';
 import { getMockUsers, saveMockUsers } from './authUtils';
 import { authAPI, productManagerAPI } from './api';
@@ -426,11 +426,53 @@ function Profile() {
               </button>
             </div>
             <p>Track deliveries and reorder your favourites in one tap.</p>
+            <Link to="/order-history" className="view-all-orders-link">
+              View All Orders →
+            </Link>
           </header>
           <div className="order-list">
-            {ordersLoading ? (
-              <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
-                Loading orders...
+            {profile.recentOrders.map((order) => (
+              <div key={order.id} className="order-item">
+                <div className="order-meta">
+                  <span className="order-id">{order.id}</span>
+                  <span className={`status-chip status-${order.status.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {order.status}
+                  </span>
+                </div>
+                <p className="order-date">{formatDate(order.date)}</p>
+                <p className="order-total">
+                  {order.total.toLocaleString('tr-TR', {
+                    style: 'currency',
+                    currency: order.currency,
+                  })}
+                </p>
+                <ul className="order-products">
+                  {order.items.map((item, index) => (
+                    <li key={`${order.id}-${index}`}>
+                      {item.name}
+                      <span className="quantity">×{item.quantity}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="order-actions">
+                  <button 
+                    type="button" 
+                    className="primary-link"
+                    onClick={() => navigate('/order-history')}
+                  >
+                    View order
+                  </button>
+                  <button 
+                    type="button" 
+                    className="ghost-button"
+                    onClick={() => {
+                      // Navigate to products page for "Buy again"
+                      navigate('/products');
+                    }}
+                  >
+                    Buy again
+                  </button>
+                </div>
               </div>
             ) : recentOrders.length === 0 ? (
               <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>

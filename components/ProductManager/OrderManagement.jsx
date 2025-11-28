@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { productManagerAPI } from '../../api';
+import { useSearchParams } from 'react-router-dom';
+import { productManagerAPI } from '../api';
 import './OrderManagement.css';
 
 function OrderManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+
+  useEffect(() => {
+    // URL'den status parametresini al
+    const statusFromUrl = searchParams.get('status');
+    if (statusFromUrl) {
+      setStatusFilter(statusFromUrl);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchOrders();
@@ -59,7 +69,16 @@ function OrderManagement() {
         <div className="filter-controls">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              const newStatus = e.target.value;
+              setStatusFilter(newStatus);
+              // URL'yi güncelle
+              if (newStatus) {
+                setSearchParams({ status: newStatus });
+              } else {
+                setSearchParams({});
+              }
+            }}
             className="status-filter"
           >
             <option value="">All Orders</option>

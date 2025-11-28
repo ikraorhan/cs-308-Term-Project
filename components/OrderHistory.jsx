@@ -12,8 +12,16 @@ function OrderHistory() {
   const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
+    // Check if user is authenticated
+    const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
+    if (!isAuthenticated) {
+      // Redirect to login if not authenticated
+      navigate('/login', { state: { from: '/order-history' } });
+      return;
+    }
+    
     loadUserEmail();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (userEmail) {
@@ -37,11 +45,15 @@ function OrderHistory() {
       } else {
         setError('User email not found. Please log in again.');
         setLoading(false);
+        // Redirect to login after a short delay
+        setTimeout(() => navigate('/login'), 2000);
       }
     } catch (err) {
       console.error('Failed to get user email:', err);
       setError('Failed to load user information. Please log in again.');
       setLoading(false);
+      // Redirect to login after a short delay
+      setTimeout(() => navigate('/login'), 2000);
     }
   };
 

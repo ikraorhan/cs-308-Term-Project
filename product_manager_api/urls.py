@@ -7,6 +7,7 @@ from . import views
 urlpatterns = [
     # Dashboard
     path('dashboard/stats/', views.dashboard_stats, name='dashboard_stats'),
+    path('delivery/dashboard/stats/', views.delivery_dashboard_stats, name='delivery_dashboard_stats'),
     
     # Product Management
     path('products/', views.product_list_create, name='product_list_create'),
@@ -21,8 +22,10 @@ urlpatterns = [
     path('stock/<int:product_id>/', views.stock_update, name='stock_update'),
     
     # Order/Delivery Management
+    path('orders/', views.order_list, name='order_list'),
+    path('orders/history/', views.order_history, name='order_history'),
+    path('orders/<str:delivery_id>/', views.order_detail, name='order_detail'),
     # Note: More specific paths must come before less specific ones
-    path('orders/history/', views.user_order_history, name='user_order_history'),
     path('orders/create/', views.create_order, name='create_order'),
     path('orders/<str:delivery_id>/status/', views.order_update_status, name='order_update_status'),
     path('orders/<str:delivery_id>/', views.order_detail, name='order_detail'),

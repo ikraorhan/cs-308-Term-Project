@@ -85,7 +85,10 @@ export default function Menubar() {
         <Link to="/cart">Cart</Link>
         <Link to="/profile">Profile</Link>
         {isAdmin && (
-          <Link to="/product-manager/comments">Comment Approval</Link>
+          <>
+            <Link to="/product-manager/comments">Comment Approval</Link>
+            <Link to="/delivery/dashboard">Delivery Dashboard</Link>
+          </>
         )}
       </div>
       <div className="user-section">
