@@ -304,6 +304,13 @@ export const productManagerAPI = {
   },
 
   /**
+   * Get delivery department dashboard statistics
+   */
+  async getDeliveryDashboardStats() {
+    return productManagerRequest('/delivery/dashboard/stats/');
+  },
+
+  /**
    * Get all products for management
    */
   async getManagerProducts() {
@@ -449,6 +456,14 @@ export const productManagerAPI = {
       method: 'POST',
       body: JSON.stringify(reviewData),
     });
+  },
+
+  /**
+   * Get order history for a user by email
+   * @param {string} email - User email address
+   */
+  async getOrderHistory(email) {
+    return productManagerRequest(`/orders/history/?email=${encodeURIComponent(email)}`);
   },
 };
 

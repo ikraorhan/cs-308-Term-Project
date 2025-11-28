@@ -305,6 +305,69 @@ def order_detail(request, delivery_id):
     
     return Response(order, status=status.HTTP_200_OK)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def order_history(request):
+    """Get order history for a specific user by email"""
+    email = request.query_params.get('email')
+    
+    if not email:
+        return Response(
+            {'error': 'Email parameter is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        from .models import Order
+        USE_ORDER_DB = True
+    except ImportError:
+        USE_ORDER_DB = False
+        Order = None
+    
+    if USE_ORDER_DB and Order:
+        # Use database
+        orders_query = Order.objects.filter(customer_email=email).order_by('-order_date', '-created_at')
+        
+        orders_data = [{
+            'delivery_id': o.delivery_id,
+            'customer_id': o.customer_id,
+            'customer_name': o.customer_name,
+            'customer_email': o.customer_email,
+            'product_id': o.product_id,
+            'product_name': o.product_name,
+            'quantity': o.quantity,
+            'total_price': float(o.total_price),
+            'delivery_address': o.delivery_address,
+            'status': o.status,
+            'order_date': o.order_date.strftime('%Y-%m-%d'),
+            'delivery_date': o.delivery_date.strftime('%Y-%m-%d') if o.delivery_date else None,
+            'created_at': o.created_at.isoformat() if hasattr(o, 'created_at') else None,
+        } for o in orders_query]
+    else:
+        # Use mock data
+        orders_data = [
+            {
+                'delivery_id': o.get('delivery_id', ''),
+                'customer_id': o.get('customer_id', ''),
+                'customer_name': o.get('customer_name', ''),
+                'customer_email': o.get('customer_email', ''),
+                'product_id': o.get('product_id', 0),
+                'product_name': o.get('product_name', ''),
+                'quantity': o.get('quantity', 0),
+                'total_price': float(o.get('total_price', 0)),
+                'delivery_address': o.get('delivery_address', ''),
+                'status': o.get('status', 'processing'),
+                'order_date': o.get('order_date', ''),
+                'delivery_date': o.get('delivery_date'),
+            }
+            for o in MOCK_ORDERS if o.get('customer_email', '').lower() == email.lower()
+        ]
+    
+    return Response({
+        'orders': orders_data,
+        'count': len(orders_data)
+    }, status=status.HTTP_200_OK)
+
 @api_view(['PUT'])
 @permission_classes([AllowAny])
 def order_update_status(request, delivery_id):
@@ -530,6 +593,116 @@ def dashboard_stats(request):
         'pending_comments': Review.objects.filter(status='pending').count() if (USE_DATABASE and Review) else len([c for c in MOCK_COMMENTS if c['status'] == 'pending']),
         'total_categories': len(MOCK_CATEGORIES)
     }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def delivery_dashboard_stats(request):
+    """Return delivery department dashboard statistics"""
+    from django.db.models import Sum
+    from datetime import timedelta
+    
+    # Try to use database Order model, fallback to MOCK_ORDERS
+    try:
+        from .models import Order
+        USE_ORDER_DB = True
+    except ImportError:
+        USE_ORDER_DB = False
+        Order = None
+    
+    if USE_ORDER_DB and Order:
+        # Use database
+        total_orders = Order.objects.count()
+        processing_orders = Order.objects.filter(status='processing').count()
+        in_transit_orders = Order.objects.filter(status='in-transit').count()
+        delivered_orders = Order.objects.filter(status='delivered').count()
+        
+        today = timezone.now().date()
+        today_orders = Order.objects.filter(order_date=today).count()
+        pending_deliveries = processing_orders + in_transit_orders
+        
+        delivered_revenue = Order.objects.filter(status='delivered').aggregate(
+            total=Sum('total_price')
+        )['total'] or 0
+        
+        delivered_with_date = Order.objects.filter(
+            status='delivered',
+            delivery_date__isnull=False
+        )
+        
+        avg_delivery_days = None
+        if delivered_with_date.exists():
+            total_days = 0
+            count = 0
+            for order in delivered_with_date:
+                if order.delivery_date and order.order_date:
+                    days = (order.delivery_date - order.order_date).days
+                    if days >= 0:
+                        total_days += days
+                        count += 1
+            if count > 0:
+                avg_delivery_days = round(total_days / count, 1)
+        
+        seven_days_ago = today - timedelta(days=7)
+        recent_orders = Order.objects.filter(order_date__gte=seven_days_ago).count()
+        
+        two_days_ago = today - timedelta(days=2)
+        urgent_orders = Order.objects.filter(
+            status='processing',
+            order_date__lt=two_days_ago
+        ).count()
+    else:
+        # Use mock data
+        total_orders = len(MOCK_ORDERS)
+        processing_orders = len([o for o in MOCK_ORDERS if o.get('status') == 'processing'])
+        in_transit_orders = len([o for o in MOCK_ORDERS if o.get('status') == 'in-transit'])
+        delivered_orders = len([o for o in MOCK_ORDERS if o.get('status') == 'delivered'])
+        pending_deliveries = processing_orders + in_transit_orders
+        
+        today = timezone.now().date()
+        today_str = today.strftime('%Y-%m-%d')
+        today_orders = len([o for o in MOCK_ORDERS if o.get('order_date') == today_str])
+        
+        delivered_revenue = sum(float(o.get('total_price', 0)) for o in MOCK_ORDERS if o.get('status') == 'delivered')
+        
+        # Calculate average delivery days from mock data
+        delivered_with_dates = [o for o in MOCK_ORDERS if o.get('status') == 'delivered' and o.get('delivery_date') and o.get('order_date')]
+        avg_delivery_days = None
+        if delivered_with_dates:
+            total_days = 0
+            for order in delivered_with_dates:
+                try:
+                    from datetime import datetime
+                    order_date = datetime.strptime(order['order_date'], '%Y-%m-%d').date()
+                    delivery_date = datetime.strptime(order['delivery_date'], '%Y-%m-%d').date()
+                    days = (delivery_date - order_date).days
+                    if days >= 0:
+                        total_days += days
+                except:
+                    pass
+            if len(delivered_with_dates) > 0:
+                avg_delivery_days = round(total_days / len(delivered_with_dates), 1)
+        
+        seven_days_ago = today - timedelta(days=7)
+        from datetime import datetime as dt
+        recent_orders = len([o for o in MOCK_ORDERS if o.get('order_date') and dt.strptime(o['order_date'], '%Y-%m-%d').date() >= seven_days_ago])
+        
+        two_days_ago = today - timedelta(days=2)
+        urgent_orders = len([o for o in MOCK_ORDERS if o.get('status') == 'processing' and o.get('order_date') and dt.strptime(o['order_date'], '%Y-%m-%d').date() < two_days_ago])
+    
+    data = {
+        "total_orders": total_orders,
+        "processing_orders": processing_orders,
+        "in_transit_orders": in_transit_orders,
+        "delivered_orders": delivered_orders,
+        "pending_deliveries": pending_deliveries,
+        "today_orders": today_orders,
+        "recent_orders": recent_orders,
+        "urgent_orders": urgent_orders,
+        "delivered_revenue": float(delivered_revenue),
+        "avg_delivery_days": avg_delivery_days,
+    }
+    
+    return Response(data, status=status.HTTP_200_OK)
 
 # =============================
 # Create Order (Frontend Checkout)

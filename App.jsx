@@ -5,24 +5,28 @@ import Signup from './components/Signup.jsx';
 import Menubar from './components/Menubar';
 import Homepage from './components/Homepage';
 import Products from './components/Products';
-import ProductDetail from './components/ProductDetail';
 import Cart from './components/Cart';
 import About from './components/About.jsx';
 import Categories from './components/Categories.jsx';
 import ForgotPassword from './components/ForgotPassword.jsx';
 import Profile from './components/Profile.jsx';
-import CommentApproval from './components/ProductManager/CommentApproval.jsx';
 import { CartProvider } from './context/CartContext';
 import Notification from './components/Notification';
 import './App.css';
+import Checkout from "./components/src/Checkout";
+import OrderConfirmation from "./OrderConfirmation";
+import DeliveryDashboard from "./components/DeliveryDepartment/DeliveryDashboard";
+import OrderHistory from "./components/OrderHistory";
+import OrderManagement from "./components/ProductManager/OrderManagement.jsx";
+
 
 function App() {
   return (
     <CartProvider>
-      <Notification />
       <Router>
         <div className="App">
           <Menubar />
+          <Notification />
           <Routes>
             <Route path="/" element={<Homepage />} />
             <Route path="/login" element={<Login />} />
@@ -30,11 +34,14 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/products" element={<Products />} />
-            <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/about" element={<About />} />
-            <Route path="/product-manager/comments" element={<CommentApproval />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/order-confirmation" element={<OrderConfirmation />} />
+            <Route path="/order-history" element={<OrderHistory />} />
+            <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
+            <Route path="/delivery/orders" element={<OrderManagement />} />
           </Routes>
         </div>
       </Router>

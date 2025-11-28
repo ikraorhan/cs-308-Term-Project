@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './Profile.css';
 import { getMockUsers, saveMockUsers } from './authUtils';
 import { authAPI } from './api';
@@ -416,6 +416,9 @@ function Profile() {
           <header>
             <h2>Recent orders</h2>
             <p>Track deliveries and reorder your favourites in one tap.</p>
+            <Link to="/order-history" className="view-all-orders-link">
+              View All Orders →
+            </Link>
           </header>
           <div className="order-list">
             {profile.recentOrders.map((order) => (
@@ -442,10 +445,21 @@ function Profile() {
                   ))}
                 </ul>
                 <div className="order-actions">
-                  <button type="button" className="primary-link">
+                  <button 
+                    type="button" 
+                    className="primary-link"
+                    onClick={() => navigate('/order-history')}
+                  >
                     View order
                   </button>
-                  <button type="button" className="ghost-button">
+                  <button 
+                    type="button" 
+                    className="ghost-button"
+                    onClick={() => {
+                      // Navigate to products page for "Buy again"
+                      navigate('/products');
+                    }}
+                  >
                     Buy again
                   </button>
                 </div>
