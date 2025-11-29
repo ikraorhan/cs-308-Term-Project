@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 from .models import Product, Order, Review
+import uuid
 
 MOCK_CATEGORIES = ["Food", "Accessories", "Housing", "Toys", "Health"]
 @api_view(['GET', 'POST'])
@@ -406,8 +407,107 @@ def dashboard_stats(request):
         'total_categories': products.values('category').distinct().count()
     }, status=status.HTTP_200_OK)
 
-
-
-
-
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_order(request):
+    try:
+        data = request.data
+        items = data.get('items', [])
+        customer_name = data.get('customer_name', 'Guest')
+        customer_email = data.get('customer_email', '')
+        delivery_address = data.get('delivery_address', '')
+        
+        print(f"[ORDER] Received order request: {len(items)} items, customer: {customer_name}")
+        print(f"[ORDER] Request data: {data}")
+        print(f"[ORDER] Items: {items}")
+        
+        if not items:
+            print("[ORDER] Error: No items in cart")
+            return Response({'error': 'No items in cart'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate all items first
+        products_to_process = []
+        for item in items:
+            product_id = item.get('id') or item.get('product_id')
+            quantity = item.get('quantity', 1)
+            
+            print(f"[ORDER] Processing item: product_id={product_id}, quantity={quantity}")
+            
+            if not product_id:
+                print(f"[ORDER] Error: Invalid product ID in item: {item}")
+                return Response({'error': 'Invalid product ID in cart'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                product = Product.objects.get(id=product_id)
+                print(f"[ORDER] Product found: {product.name}, stock: {product.quantity_in_stock}, requested: {quantity}")
+                if product.quantity_in_stock < quantity:
+                    error_msg = f'Insufficient stock for {product.name}. Available: {product.quantity_in_stock}, Requested: {quantity}'
+                    print(f"[ORDER] Error: {error_msg}")
+                    return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
+                products_to_process.append((product, quantity))
+            except Product.DoesNotExist:
+                error_msg = f'Product not found: ID {product_id}'
+                print(f"[ORDER] Error: {error_msg}")
+                return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Process all items
+        created_orders = []
+        for product, quantity in products_to_process:
+            product.quantity_in_stock -= quantity
+            product.save()
+            
+            delivery_id = f"DEL-{uuid.uuid4().hex[:6].upper()}"
+            customer_id = f"CUST-{uuid.uuid4().hex[:6].upper()}"
+            total_price = float(product.price) * quantity
+            
+            # Validate product name
+            if not product.name or not product.name.strip():
+                error_msg = f'Product name is missing for product ID {product.id}'
+                print(f"[ORDER] Error: {error_msg}")
+                return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                order = Order.objects.create(
+                    delivery_id=delivery_id,
+                    customer_id=customer_id,
+                    customer_name=customer_name,
+                    customer_email=customer_email,
+                    product_id=product.id,
+                    product_name=product.name,
+                    quantity=quantity,
+                    total_price=total_price,
+                    delivery_address=delivery_address,
+                    status='processing',
+                    order_date=timezone.now().date()
+                )
+                
+                created_orders.append({
+                    'delivery_id': order.delivery_id,
+                    'product_name': product.name,
+                    'quantity': quantity
+                })
+            except Exception as order_error:
+                error_msg = f'Failed to create order for {product.name}: {str(order_error)}'
+                print(f"[ORDER] Error creating order: {error_msg}")
+                import traceback
+                traceback.print_exc()
+                return Response({'error': error_msg}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        print(f"[ORDER] Success: Created {len(created_orders)} orders")
+        return Response({'message': 'Orders created', 'orders': created_orders}, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[ORDER] Exception: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        # Daha açıklayıcı hata mesajı
+        if 'product_name' in error_msg.lower() or 'missing field' in error_msg.lower():
+            return Response({
+                'error': f'Order creation failed: {error_msg}. Please check product data.',
+                'details': 'Product name or other required fields may be missing.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({'error': f'Server error: {error_msg}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

@@ -9,6 +9,7 @@ import PaymentMockFlow from "./PaymentMockFlow";
 
 function Cart() {
   const navigate = useNavigate();
+  const { clearCart } = useCart();
   const isAuthenticated = localStorage.getItem('is_authenticated');
   const userEmail = localStorage.getItem('user_email');
   const userName = localStorage.getItem('user_name');
@@ -114,31 +115,79 @@ function Cart() {
   };
 
   // When payment is successful (keep modal open on success screen)
-  const handlePaymentSuccess = (newOrderId) => {
+  const handlePaymentSuccess = async (newOrderId) => {
     setOrderId(newOrderId);
     
-    // Save order to localStorage for review/rating functionality
-    if (isAuthenticated && cartItems.length > 0) {
-      const userId = localStorage.getItem('user_id') || userEmail;
-      // For testing purposes, set status to 'delivered' so users can review products immediately
-      // In production, this would be updated by an admin or delivery system
-      const order = saveOrder({
-        id: newOrderId,
-        userId: userId,
-        userName: userName || 'User',
-        userEmail: userEmail,
-        items: cartItems.map(item => ({
-          productId: item.id,
-          productName: item.name,
-          quantity: item.quantity || 1,
-          price: item.price || 0,
-        })),
-        total: total,
-        currency: 'TRY',
-        status: 'delivered', // Set to 'delivered' so users can review products immediately
-        deliveryAddress: localStorage.getItem('user_address') || '',
+    // Save cart items before clearing
+    const itemsToSave = [...cartItems];
+    
+    try {
+      const response = await fetch('http://localhost:8000/orders/create/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: itemsToSave.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity || 1,
+            price: item.price || 0,
+          })),
+          customer_name: userName || userEmail || 'Guest',
+          customer_email: userEmail || '',
+          delivery_address: localStorage.getItem('user_address') || '',
+        }),
       });
-      console.log('Order saved:', order);
+
+      const data = await response.json();
+      console.log('Order creation response:', { status: response.status, data });
+      
+      if (response.ok && data.orders && data.orders.length === itemsToSave.length) {
+        clearCart();
+        localStorage.removeItem('cart_items');
+        setCartItems([]);
+        
+        // Save order to localStorage for review/rating functionality
+        if (isAuthenticated && itemsToSave.length > 0) {
+          const userId = localStorage.getItem('user_id') || userEmail;
+          saveOrder({
+            id: newOrderId,
+            userId: userId,
+            userName: userName || 'User',
+            userEmail: userEmail,
+            items: itemsToSave.map(item => ({
+              productId: item.id,
+              productName: item.name,
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+            })),
+            total: total,
+            currency: 'TRY',
+            status: 'delivered',
+            deliveryAddress: localStorage.getItem('user_address') || '',
+          });
+        }
+      } else {
+        // Sipariş başarısız - detaylı hata mesajı oluştur
+        let errorMessage = 'Sipariş oluşturulamadı';
+        if (data.error) {
+          errorMessage = data.error;
+        } else if (data.orders && data.orders.length < itemsToSave.length) {
+          errorMessage = `Sadece ${data.orders.length} ürün sipariş edilebildi. ${itemsToSave.length} ürün bekleniyordu.`;
+        } else if (!response.ok) {
+          errorMessage = `Sunucu hatası: ${response.status}`;
+        }
+        console.error('Order creation failed:', { 
+          status: response.status, 
+          data, 
+          itemsToSave,
+          errorMessage 
+        });
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Order creation error:', error);
+      // Hata fırlat ki PaymentMockFlow success ekranını göstermesin
+      throw error;
     }
   };
 

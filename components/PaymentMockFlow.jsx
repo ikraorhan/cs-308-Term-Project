@@ -3,7 +3,7 @@ import "./PaymentMockFlow.css";
 // 🔹 EKLEME: Invoice PDF için util
 import { generateInvoicePdf } from "./invoiceUtils";
 
-export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = [], onSuccess, onCancel }) {
+export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = [], onSuccess, onCancel, order }) {
   const [step, setStep] = useState("card"); // "card" | "3ds" | "success"
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -69,20 +69,16 @@ export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = 
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Sipariş emaili gönderildi!', result);
-        // Kullanıcıya görünür mesaj göster
-        alert('✅ Sipariş emaili başarıyla gönderildi! Gmail\'ini kontrol et.');
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('⚠️ Email gönderilemedi:', errorData);
-        alert('⚠️ Email gönderilemedi, ama sipariş tamamlandı. Hata: ' + (errorData.error || 'Bilinmeyen hata'));
       }
     } catch (error) {
       console.error('⚠️ Email hatası:', error);
-      alert('⚠️ Email gönderilirken hata oluştu: ' + error.message);
     }
   }
 
-  function handle3DSConfirm(e) {
+  async function handle3DSConfirm(e) {
     e.preventDefault();
     // Fake rule: accept code "123456"
     if (code !== "123456") {
@@ -92,13 +88,30 @@ export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = 
     setError("");
     const fakeOrderId = "INV-" + Math.floor(Math.random() * 900000 + 100000);
     setOrderId(fakeOrderId);
-    setStep("success");
     
-    // Email gönder
-    sendOrderEmail(fakeOrderId, amount);
-    
+    // Önce sipariş oluşturmayı dene
+    let orderSuccess = false;
     if (onSuccess) {
-      onSuccess(fakeOrderId);
+      try {
+        await onSuccess(fakeOrderId);
+        orderSuccess = true;
+      } catch (error) {
+        console.error('Order creation failed:', error);
+        const errorMsg = error.message || 'Sipariş oluşturulamadı. Lütfen tekrar deneyin.';
+        setError(errorMsg);
+        // 3DS ekranında kal, hata mesajını göster
+        alert(`❌ ${errorMsg}\n\nLütfen sepetinizi kontrol edin ve tekrar deneyin.`);
+        return;
+      }
+    } else {
+      orderSuccess = true;
+    }
+    
+    // Sipariş başarılıysa success ekranını göster
+    if (orderSuccess) {
+      setStep("success");
+      // Email gönder
+      sendOrderEmail(fakeOrderId, amount);
     }
   }
 
@@ -108,7 +121,7 @@ export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = 
 
   // 🔹 EKLEME: PDF indirme handler'ı
   function handleDownloadInvoice() {
-    if (!order) {
+    if (!order || !order.items) {
       console.warn("No order data provided for invoice.");
       return;
     }
@@ -232,7 +245,7 @@ export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = 
             </p>
 
             {/* 🔹 EKLEME: Invoice önce ekranda görünsün */}
-            {order && (
+            {order && order.items && (
               <div className="pm-invoice-preview">
                 <h4>Invoice Summary</h4>
                 <p>
