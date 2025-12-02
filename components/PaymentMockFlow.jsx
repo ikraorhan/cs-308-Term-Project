@@ -37,13 +37,15 @@ export default function PaymentMockFlow({ amount, currency = "TRY", cartItems = 
   // Email gönderme fonksiyonu
   async function sendOrderEmail(orderId, amount) {
     try {
-      // Gerçek email adresi kontrolü - @gmail.com veya @sabanciuniv.edu olmalı
-      let userEmail = localStorage.getItem('user_email') || 'almiraaygun@gmail.com';
-      // Eğer test email'i ise (admin@petstore.com gibi), gerçek email kullan
-      if (!userEmail.includes('@gmail.com') && !userEmail.includes('@sabanciuniv.edu')) {
-        userEmail = 'almiraaygun@gmail.com';
+      // Get user email from localStorage
+      const userEmail = localStorage.getItem('user_email');
+      const userName = localStorage.getItem('user_name') || 'Customer';
+      
+      // Skip email if no valid user email is available
+      if (!userEmail || (!userEmail.includes('@gmail.com') && !userEmail.includes('@sabanciuniv.edu'))) {
+        console.log('⚠️ No valid email address found, skipping email notification');
+        return;
       }
-      const userName = localStorage.getItem('user_name') || 'Müşteri';
       
       const response = await fetch('http://localhost:8000/api/send-order-email/', {
         method: 'POST',

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Profile.css';
 import { getMockUsers, saveMockUsers } from './authUtils';
-import { authAPI } from './api';
+import { authAPI, productManagerAPI } from './api';
 
 const PROFILE_STORAGE_KEY = 'mock_profile_overview';
 
@@ -182,11 +182,59 @@ function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recentOrders, setRecentOrders] = useState([]);
 
   // Fetch profile from backend on mount
   useEffect(() => {
     loadProfileFromBackend();
+    loadRecentOrders();
   }, []);
+
+  const loadRecentOrders = async () => {
+    try {
+      const storedEmail = localStorage.getItem('user_email');
+      if (!storedEmail) {
+        // Try to get email from backend
+        try {
+          const response = await authAPI.getCurrentUser();
+          if (response.data && response.data.email) {
+            const email = response.data.email;
+            const orderResponse = await productManagerAPI.getOrderHistory(email);
+            if (orderResponse.data && orderResponse.data.orders) {
+              const orders = orderResponse.data.orders.slice(0, 3); // Get last 3 orders
+              setRecentOrders(transformOrders(orders));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to get user email:', err);
+        }
+      } else {
+        const orderResponse = await productManagerAPI.getOrderHistory(storedEmail);
+        if (orderResponse.data && orderResponse.data.orders) {
+          const orders = orderResponse.data.orders.slice(0, 3); // Get last 3 orders
+          setRecentOrders(transformOrders(orders));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load recent orders:', err);
+      // Keep empty array on error
+      setRecentOrders([]);
+    }
+  };
+
+  const transformOrders = (orders) => {
+    return orders.map(order => ({
+      id: order.delivery_id || order.id,
+      date: order.order_date || order.date,
+      status: order.status || 'Processing',
+      total: parseFloat(order.total_price || order.total || 0),
+      currency: 'TRY',
+      items: [{
+        name: order.product_name || 'Product',
+        quantity: order.quantity || 1,
+      }]
+    }));
+  };
 
   const loadProfileFromBackend = async () => {
     try {
@@ -421,7 +469,7 @@ function Profile() {
             </Link>
           </header>
           <div className="order-list">
-            {profile.recentOrders.map((order) => (
+            {recentOrders.length > 0 ? recentOrders.map((order) => (
               <div key={order.id} className="order-item">
                 <div className="order-meta">
                   <span className="order-id">{order.id}</span>
@@ -464,7 +512,11 @@ function Profile() {
                   </button>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="order-item" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                <p>No recent orders</p>
+              </div>
+            )}
           </div>
         </article>
 

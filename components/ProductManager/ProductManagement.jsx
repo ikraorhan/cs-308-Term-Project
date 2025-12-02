@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { productManagerAPI } from '../../api';
+import { productManagerAPI } from '../api';
 import './ProductManagement.css';
 
 function ProductManagement() {
