@@ -16,7 +16,7 @@ import './App.css';
 import Checkout from "./components/src/Checkout";
 import OrderConfirmation from "./OrderConfirmation";
 import DeliveryDashboard from "./components/DeliveryDepartment/DeliveryDashboard";
-import OrderHistory from "./components/OrderHistory";
+import OrderHistory from "./components/OrderHistory.jsx";
 import OrderManagement from "./components/ProductManager/OrderManagement.jsx";
 import CommentApproval from "./components/ProductManager/CommentApproval.jsx";
 
