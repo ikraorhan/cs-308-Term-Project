@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCart } from '../context/CartContext';
 import "./PaymentMockFlow.css";
-// 🔹 EKLEME: Invoice PDF için util
-import { generateInvoicePdf } from "./invoiceUtils";
+// generateInvoicePdf yanına getInvoiceBase64 eklendi
+import { generateInvoicePdf, getInvoiceBase64 } from "./invoiceUtils";
 
 export default function PaymentMockFlow({
   amount,
@@ -13,7 +14,8 @@ export default function PaymentMockFlow({
   onCancel,
 }) {
   const navigate = useNavigate();
-  const [step, setStep] = useState("card"); // "card" | "3ds" | "success"
+  const { setNotification } = useCart();
+  const [step, setStep] = useState("card"); 
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
@@ -22,13 +24,70 @@ export default function PaymentMockFlow({
   const [code, setCode] = useState("");
   const [orderId, setOrderId] = useState(null);
 
+  // Email gönderme fonksiyonunda PDF oluşturma mantığı eklendi
+  // Not: Backend'e göndermek için 'fullOrderData' parametresini ekliyoruz
+  async function sendOrderEmail(orderId, amount, fullOrderData) {
+    try {
+      let userEmail = localStorage.getItem('user_email') || 'almiraaygun@gmail.com';
+      if (!userEmail.includes('@gmail.com') && !userEmail.includes('@sabanciuniv.edu')) {
+        userEmail = 'almiraaygun@gmail.com';
+      }
+      const userName = localStorage.getItem('user_name') || 'Müşteri';
+      
+      // PDF Base64 verisini oluştur
+      let pdfData = null;
+      if (fullOrderData) {
+        try {
+           pdfData = getInvoiceBase64(fullOrderData);
+        } catch (pdfErr) {
+           console.error("PDF generation failed for email:", pdfErr);
+        }
+      }
+
+      const response = await fetch('http://localhost:8000/api/send-order-email/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_email: userEmail,
+          user_name: userName,
+          order_id: orderId,
+          amount: amount,
+          currency: currency,
+          items: cartItems.map(item => ({
+            name: item.name || item.product_name,
+            quantity: item.quantity || 1,
+            price: item.price || 0
+          })),
+          // Backend'e PDF verisini gönderiyoruz
+          pdf_base64: pdfData 
+        })
+      });
+      
+      if (response.ok) {
+        if (setNotification) {
+            setNotification('✅ Faturanız email adresinize gönderildi!');
+        }
+      } else {
+        if (setNotification) {
+            setNotification('⚠️ Sipariş alındı fakat email gönderilemedi.');
+        }
+      }
+    } catch (error) {
+      console.error('⚠️ Email hatası:', error);
+      if (setNotification) {
+          setNotification('⚠️ Email servisinde geçici bir sorun oluştu.');
+      }
+    }
+  }
+
   const maskedCard = cardNumber
     ? "**** **** **** " + (cardNumber.slice(-4) || "0000")
     : "**** **** **** 0000";
 
   function handleCardSubmit(e) {
     e.preventDefault();
-    // basic fake validation
     if (!cardName || !cardNumber || !expiry || !cvv) {
       setError("Please fill in all fields.");
       return;
@@ -45,62 +104,14 @@ export default function PaymentMockFlow({
     setStep("3ds");
   }
 
-  // Email gönderme fonksiyonu
-  async function sendOrderEmail(orderId, amount) {
-    try {
-      // Gerçek email adresi kontrolü - @gmail.com veya @sabanciuniv.edu olmalı
-      let userEmail = localStorage.getItem('user_email') || 'almiraaygun@gmail.com';
-      // Eğer test email'i ise (admin@petstore.com gibi), gerçek email kullan
-      if (!userEmail.includes('@gmail.com') && !userEmail.includes('@sabanciuniv.edu')) {
-        userEmail = 'almiraaygun@gmail.com';
-      }
-      const userName = localStorage.getItem('user_name') || 'Müşteri';
-      
-      const response = await fetch('http://localhost:8000/api/send-order-email/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_email: userEmail,
-          user_name: userName,
-          order_id: orderId,
-          amount: amount,
-          currency: currency,
-          items: cartItems.map(item => ({
-            name: item.name || item.product_name,
-            quantity: item.quantity || 1,
-            price: item.price || 0
-          }))
-        })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Sipariş emaili gönderildi!', result);
-        // Kullanıcıya görünür mesaj göster
-        alert('✅ Sipariş emaili başarıyla gönderildi! Gmail\'ini kontrol et.');
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('⚠️ Email gönderilemedi:', errorData);
-        alert('⚠️ Email gönderilemedi, ama sipariş tamamlandı. Hata: ' + (errorData.error || 'Bilinmeyen hata'));
-      }
-    } catch (error) {
-      console.error('⚠️ Email hatası:', error);
-      alert('⚠️ Email gönderilirken hata oluştu: ' + error.message);
-    }
-  }
-
   async function handle3DSConfirm(e) {
     e.preventDefault();
-    // Fake rule: accept code "123456"
     if (code !== "123456") {
       setError("Incorrect code.");
       return;
     }
     setError("");
     
-    // Önce order'ı database'e kaydet
     try {
       const userEmail = localStorage.getItem('user_email') || 'almiraaygun@gmail.com';
       const userName = localStorage.getItem('user_name') || 'Müşteri';
@@ -111,8 +122,10 @@ export default function PaymentMockFlow({
         return;
       }
       
-      // Her item için ayrı order oluştur (çünkü create_order endpoint'i tek product için çalışıyor)
       const orderIds = [];
+      // Basitlik için ilk item'ın bilgileriyle dummy bir yapı kuralım veya API'den döneni bekleyelim.
+      // Ancak invoice oluşturmak için elimizde tüm verinin hazır olması lazım.
+      
       for (const item of cartItems) {
         const orderData = {
           customer_name: userName,
@@ -133,33 +146,56 @@ export default function PaymentMockFlow({
         });
         
         if (!orderResponse.ok) {
-          const errorData = await orderResponse.json().catch(() => ({}));
-          console.error('Order creation failed for item:', item.name, errorData);
-          // Devam et, diğer item'lar için order oluştur
+          console.error('Order creation failed for item:', item.name);
           continue;
         }
         
         const orderResult = await orderResponse.json();
-        const orderId = orderResult.order?.delivery_id || orderResult.delivery_id;
-        if (orderId) {
-          orderIds.push(orderId);
+        const createdId = orderResult.order?.delivery_id || orderResult.delivery_id;
+        if (createdId) {
+          orderIds.push(createdId);
         }
       }
       
-      // İlk order ID'yi kullan (veya tüm order ID'lerini birleştir)
       const mainOrderId = orderIds.length > 0 
         ? orderIds[0] 
         : `INV-${Math.floor(Math.random() * 900000 + 100000)}`;
       
       setOrderId(mainOrderId);
+      
+      // Fatura için gerekli veri objesini hazırla
+      // NOT: Gerçek projede vergi ve subtotal hesaplaması daha hassas yapılmalı.
+      const subtotalVal = amount / 1.18; 
+      const taxVal = amount - subtotalVal;
+      
+      const fullOrderData = {
+        id: mainOrderId,
+        date: new Date().toLocaleDateString('tr-TR'),
+        customerName: userName,
+        paymentMethod: "Credit Card",
+        address: {
+            line1: deliveryAddress,
+            city: "Istanbul",
+            country: "Turkey"
+        },
+        items: cartItems.map(i => ({
+            name: i.name || i.product_name,
+            quantity: i.quantity || 1,
+            price: i.price || 0
+        })),
+        subtotal: subtotalVal,
+        tax: taxVal,
+        total: amount
+      };
+
+      // Modal kapanmasın, başarı ekranına geçsin
       setStep("success");
       
-      // Email gönder
-      await sendOrderEmail(mainOrderId, amount);
+      // Email işlemini (PDF ekleyerek) başlat
+      // React state güncellemesi asenkron olduğu için 'order' prop'u yerine
+      // burada oluşturduğumuz 'fullOrderData'yı kullanıyoruz.
+      sendOrderEmail(mainOrderId, amount, fullOrderData);
       
-      if (onSuccess) {
-        onSuccess(mainOrderId);
-      }
     } catch (error) {
       console.error('Error creating order:', error);
       setError('An error occurred. Please try again.');
@@ -167,26 +203,23 @@ export default function PaymentMockFlow({
   }
 
   function handleClose() {
-    // Eğer success ekranındaysa profile'a yönlendir (onCancel çağırma)
     if (step === "success") {
-      console.log('Success ekranında, profile\'a yönlendiriliyor...');
-      navigate('/profile');
-      // onCancel çağırma, direkt navigate et
+      if (onSuccess) onSuccess(orderId);
+      else if (onCancel) onCancel();
       return;
     }
-    // Diğer durumlarda normal kapat
-    console.log('Normal kapatma, step:', step);
-    if (onCancel) {
-      onCancel();
-    }
+    if (onCancel) onCancel();
   }
 
-  // 🔹 EKLEME: PDF indirme handler'ı
+  function handleContinueToProfile() {
+    if (onSuccess) onSuccess(orderId);
+    navigate('/profile');
+  }
+
   function handleDownloadInvoice() {
-    if (!order) {
-      console.warn("No order data provided for invoice.");
-      return;
-    }
+    // Eğer dışarıdan gelen order prop'u yoksa, son işlemdeki veriyi kullanmak gerekebilir
+    // Ancak basitlik adına mevcut order prop'unu veya başarı ekranındaki veriyi kullanıyoruz.
+    if (!order) return;
     try {
       generateInvoicePdf(order);
     } catch (err) {
@@ -298,7 +331,9 @@ export default function PaymentMockFlow({
           <div className="pm-success">
             <div className="pm-success-icon">✔</div>
             <h3>Payment successful</h3>
-            <p>Your payment has been processed.</p>
+            {/* GÜNCELLEME: İstenilen yazı değişikliği */}
+            <p>Your order details and invoice have been sent to your email address.</p>
+            
             <p className="pm-success-order">
               Order number: <span>{orderId}</span>
             </p>
@@ -306,7 +341,6 @@ export default function PaymentMockFlow({
               Amount paid: <strong>{amount} {currency}</strong>
             </p>
 
-            {/* 🔹 EKLEME: Invoice önce ekranda görünsün */}
             {order && (
               <div className="pm-invoice-preview">
                 <h4>Invoice Summary</h4>
@@ -363,7 +397,7 @@ export default function PaymentMockFlow({
               </div>
             )}
 
-            <button className="pm-primary" onClick={handleClose}>
+            <button className="pm-primary" onClick={handleContinueToProfile}>
               Continue to Profile
             </button>
           </div>

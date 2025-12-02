@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext";
+// import { useCart } from "../context/CartContext"; // Kept if you need it, though not used in the logic below
 import { saveOrder } from "./reviewUtils";
 import "./Cart.css";
 import PaymentMockFlow from "./PaymentMockFlow";
@@ -22,21 +22,31 @@ function Cart() {
   const [orderId, setOrderId] = useState(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
+    // NOT: Login kontrolünü kaldırdık (Ziyaretçiler de görebilsin diye)
 
-    // Load cart data
+    // LocalStorage'dan sepeti çek
     const savedCart = localStorage.getItem('cart_items');
+
     if (savedCart) {
-      const items = JSON.parse(savedCart);
-      setCartItems(items);
-      calculateTotal(items);
+      try {
+        const items = JSON.parse(savedCart);
+        // Eğer savedCart varsa onu yükle
+        setCartItems(items);
+        calculateTotal(items);
+      } catch (error) {
+        // Eğer veri bozuksa sepeti boşalt
+        console.error("Sepet verisi okunamadı:", error);
+        setCartItems([]);
+        setTotal(0);
+      }
     } else {
-      // Example cart data (fallback)
+      // ELSE BLOĞU: Eğer kayıtlı sepet yoksa
+      // Burayı KESİNLİKLE boş dizi [] olarak ayarlıyoruz.
+      // Burada daha önce "mock data" (örnek ürün) kodu varsa silinmiş oldu.
+      setCartItems([]);
+      setTotal(0);
     }
-  }, [isAuthenticated, navigate]);
+  }, []); // Bağımlılık dizisi boş, sadece sayfa açılışında çalışır
 
   const calculateTotal = (items) => {
     const totalPrice = items.reduce(
@@ -73,10 +83,10 @@ function Cart() {
   };
 
   const taxRate = 0.18;
-  const shipping = 0; // şu an için ücretsiz
-  const invoiceTotal = total + shipping;        // Kullanıcının ödediği toplam miktar
-  const invoiceSubtotal = invoiceTotal / (1 + taxRate); // KDV hariç
-  const invoiceTax = invoiceTotal - invoiceSubtotal;    // KDV miktarı
+  const shipping = 0; 
+  const invoiceTotal = total + shipping;        
+  const invoiceSubtotal = invoiceTotal / (1 + taxRate); 
+  const invoiceTax = invoiceTotal - invoiceSubtotal;    
 
   const invoiceOrder = {
     id: orderId || 'PENDING',
@@ -101,20 +111,23 @@ function Cart() {
     totalQuantity,
   };
 
-  // Open payment modal
+  // Open payment modal OR redirect to Login
   const handleCheckout = () => {
-    setShowPayment(true);
+    if (!isAuthenticated) {
+      // Logic Change: Redirect to login only when attempting to checkout
+      navigate('/login');
+    } else {
+      setShowPayment(true);
+    }
   };
 
-  // When payment is successful (keep modal open on success screen)
+  // When payment is successful
   const handlePaymentSuccess = (newOrderId) => {
     setOrderId(newOrderId);
     
-    // Save order to localStorage for review/rating functionality
     if (isAuthenticated && cartItems.length > 0) {
       const userId = localStorage.getItem('user_id') || userEmail;
-      // For testing purposes, set status to 'delivered' so users can review products immediately
-      // In production, this would be updated by an admin or delivery system
+      
       const order = saveOrder({
         id: newOrderId,
         userId: userId,
@@ -128,27 +141,22 @@ function Cart() {
         })),
         total: total,
         currency: 'TRY',
-        status: 'delivered', // Set to 'delivered' so users can review products immediately
+        status: 'delivered', 
         deliveryAddress: localStorage.getItem('user_address') || '',
       });
       console.log('Order saved:', order);
     }
     
-    // Clear cart after successful payment
     setCartItems([]);
     localStorage.removeItem('cart_items');
     
-    // Modal'ı kapat ve profile'a yönlendir
     setShowPayment(false);
-    // Profile'a yönlendir (PaymentMockFlow'daki close butonu da navigate yapacak ama burada da yapalım)
     setTimeout(() => {
       navigate('/profile');
     }, 100);
   };
 
-  // When user closes payment modal (X or Continue)
   const handlePaymentCancel = () => {
-    // Eğer orderId varsa (yani ödeme başarılı olduysa), profile'a yönlendir
     if (orderId) {
       navigate('/profile');
     } else {
@@ -156,15 +164,14 @@ function Cart() {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  // REMOVED: The render guard "if (!isAuthenticated) return null;"
 
   return (
     <div className="cart-container">
       <div className="cart-header">
         <h1>My Cart 🛒</h1>
-        <p>Hello, {userName || userEmail}!</p>
+        {/* Updated Greeting to handle Guest */}
+        <p>Hello, {userName || userEmail || 'Guest'}!</p>
       </div>
 
       {cartItems.length === 0 ? (
@@ -185,6 +192,7 @@ function Cart() {
             {cartItems.map((item) => (
               <div key={item.id} className="cart-item">
                 <div className="cart-item-image">
+                  {/* Note: Ensure item.image is rendered correctly (emoji or img tag) */}
                   <span className="item-emoji">{item.image}</span>
                 </div>
                 <div className="cart-item-details">
@@ -240,7 +248,8 @@ function Cart() {
             </div>
 
             <button onClick={handleCheckout} className="checkout-button">
-              Proceed to Payment
+              {/* Change button text slightly to indicate next step */}
+              {isAuthenticated ? "Proceed to Payment" : "Login to Checkout"}
             </button>
             <button
               onClick={() => navigate('/products')}
