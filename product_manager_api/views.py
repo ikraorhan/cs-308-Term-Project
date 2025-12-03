@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny  # TODO: Add proper authenticati
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
+from django.db.models import Avg
 import json
 
 # Mock data - Will be replaced with database in future sprints
@@ -152,9 +153,31 @@ def product_list_create(request):
             # Sort by price ascending, then by name
             products.sort(key=lambda p: (float(p.get('price', 0)), p.get('name', '').lower()))
         elif sort_option == 'popularity':
-            # Sort by popularity (stock quantity descending - highest stock = most popular), then by name
-            # Using negative value to sort descending (highest first)
-            products.sort(key=lambda p: (-int(p.get('quantity_in_stock', 0)), p.get('name', '').lower()))
+            # Sort by average rating (highest rating = most popular), then by name
+            # Get average ratings from approved reviews in database
+            try:
+                from .models import Review
+                # Get average ratings for all products from approved reviews
+                product_ratings = {}
+                ratings = Review.objects.filter(status='approved').values('product_id').annotate(avg_rating=Avg('rating'))
+                for r in ratings:
+                    product_ratings[r['product_id']] = float(r['avg_rating'])
+                
+                # Sort by rating descending (highest first), then by name
+                products.sort(key=lambda p: (-product_ratings.get(p.get('id'), 0), p.get('name', '').lower()))
+            except ImportError:
+                # Fallback: use ratings from MOCK_COMMENTS
+                product_ratings = {}
+                for comment in MOCK_COMMENTS:
+                    if comment.get('status') == 'approved':
+                        pid = comment.get('product_id')
+                        if pid not in product_ratings:
+                            product_ratings[pid] = []
+                        product_ratings[pid].append(comment.get('rating', 0))
+                
+                # Calculate averages
+                avg_ratings = {pid: sum(ratings)/len(ratings) if ratings else 0 for pid, ratings in product_ratings.items()}
+                products.sort(key=lambda p: (-avg_ratings.get(p.get('id'), 0), p.get('name', '').lower()))
         
         return Response({
             'products': products,
@@ -712,10 +735,52 @@ from api.views import send_invoice_email
 from datetime import datetime, date
 import uuid
 
+# Import Product model for stock management
+try:
+    from .models import Product
+    USE_PRODUCT_DB = True
+except ImportError:
+    USE_PRODUCT_DB = False
+    Product = None
+
+def decrease_product_stock(product_id, quantity):
+    """
+    Decrease product stock after a successful purchase.
+    Returns (success, message) tuple.
+    """
+    if USE_PRODUCT_DB and Product:
+        try:
+            product = Product.objects.get(id=product_id)
+            if product.quantity_in_stock >= quantity:
+                product.quantity_in_stock -= quantity
+                product.save()
+                print(f"Stock decreased: Product {product_id} ({product.name}) - {quantity} units. Remaining: {product.quantity_in_stock}")
+                return True, f"Stock updated successfully"
+            else:
+                print(f"Insufficient stock: Product {product_id} has {product.quantity_in_stock}, requested {quantity}")
+                return False, f"Insufficient stock. Available: {product.quantity_in_stock}"
+        except Product.DoesNotExist:
+            print(f"Product not found in database: {product_id}")
+            return False, "Product not found"
+        except Exception as e:
+            print(f"Error updating stock: {e}")
+            return False, str(e)
+    else:
+        # Fallback to mock data
+        product = next((p for p in MOCK_PRODUCTS if p['id'] == product_id), None)
+        if product:
+            if product['quantity_in_stock'] >= quantity:
+                product['quantity_in_stock'] -= quantity
+                print(f"Mock stock decreased: Product {product_id} ({product['name']}) - {quantity} units. Remaining: {product['quantity_in_stock']}")
+                return True, "Stock updated successfully"
+            else:
+                return False, f"Insufficient stock. Available: {product['quantity_in_stock']}"
+        return False, "Product not found in mock data"
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def create_order(request):
-    """Create a new order from checkout"""
+    """Create a new order from checkout and decrease product stock"""
     data = request.data
 
     required_fields = ["customer_name", "customer_email", "product_name", 
@@ -726,6 +791,19 @@ def create_order(request):
         if field not in data:
             return Response(
                 {"error": f"Missing field: {field}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # Get product_id and quantity for stock update
+    product_id = data.get("product_id")
+    quantity = int(data.get("quantity", 1))
+    
+    # Check and decrease stock BEFORE creating order
+    if product_id:
+        stock_success, stock_message = decrease_product_stock(product_id, quantity)
+        if not stock_success:
+            return Response(
+                {"error": f"Stock update failed: {stock_message}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -742,9 +820,9 @@ def create_order(request):
                 customer_id=customer_id,
                 customer_name=data["customer_name"],
                 customer_email=data["customer_email"],
-                product_id=data.get("product_id", 0),
+                product_id=product_id or 0,
                 product_name=data["product_name"],
-                quantity=data["quantity"],
+                quantity=quantity,
                 total_price=data["total_price"],
                 delivery_address=data["delivery_address"],
                 status="processing",
@@ -780,6 +858,19 @@ def create_order(request):
             )
         except Exception as e:
             print(f"Database error creating order: {e}")
+            # If order creation fails, restore the stock
+            if product_id:
+                if USE_PRODUCT_DB and Product:
+                    try:
+                        product = Product.objects.get(id=product_id)
+                        product.quantity_in_stock += quantity
+                        product.save()
+                    except:
+                        pass
+                else:
+                    product = next((p for p in MOCK_PRODUCTS if p['id'] == product_id), None)
+                    if product:
+                        product['quantity_in_stock'] += quantity
             # Fall through to mock data
     
     # Fallback to mock data
@@ -788,9 +879,9 @@ def create_order(request):
         "customer_id": customer_id,
         "customer_name": data["customer_name"],
         "customer_email": data["customer_email"],
-        "product_id": data.get("product_id", None),
+        "product_id": product_id,
         "product_name": data["product_name"],
-        "quantity": data["quantity"],
+        "quantity": quantity,
         "total_price": data["total_price"],
         "delivery_address": data["delivery_address"],
         "status": "processing",

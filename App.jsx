@@ -40,7 +40,6 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-confirmation" element={<OrderConfirmation />} />
-            <Route path="/order-history" element={<OrderHistory />} />
             <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
             <Route path="/delivery/orders" element={<OrderManagement />} />
             <Route path="/product-manager/comments" element={<CommentApproval />} />
