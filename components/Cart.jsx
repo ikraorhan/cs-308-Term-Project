@@ -67,6 +67,17 @@ function Cart() {
       removeItem(id);
       return;
     }
+    
+    // Find the item to check its maxQuantity (stock limit)
+    const item = cartItems.find((item) => item.id === id);
+    if (!item) return;
+    
+    // Check if the new quantity exceeds available stock
+    if (item.maxQuantity !== null && item.maxQuantity !== undefined && newQuantity > item.maxQuantity) {
+      alert(`Only ${item.maxQuantity} unit(s) of ${item.name} available in stock.`);
+      return;
+    }
+    
     const updatedItems = cartItems.map((item) =>
       item.id === id ? { ...item, quantity: newQuantity } : item
     );

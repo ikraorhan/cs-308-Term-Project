@@ -1,4 +1,5 @@
 // src/product_manager_api/index.js
+import { getAverageRating } from '../components/reviewUtils';
 
 const products = [
   // 1. Food (Mama)
@@ -256,8 +257,12 @@ export const productsAPI = {
     if (params.sort === "price") {
       filteredProducts.sort((a, b) => a.price - b.price);
     } else if (params.sort === "popularity") {
-      // Sort by stock quantity (higher stock = more popular)
-      filteredProducts.sort((a, b) => (b.quantity_in_stock || 0) - (a.quantity_in_stock || 0));
+      // Sort by average rating (higher rating = more popular)
+      filteredProducts.sort((a, b) => {
+        const ratingA = getAverageRating(a.id);
+        const ratingB = getAverageRating(b.id);
+        return ratingB - ratingA;
+      });
     }
     
     return Promise.resolve({ data: filteredProducts });

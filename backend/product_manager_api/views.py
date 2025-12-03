@@ -300,65 +300,6 @@ def order_update_status(request, delivery_id):
         status=status.HTTP_400_BAD_REQUEST
     )
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def create_order(request):
-    """
-    Frontend checkout için yeni sipariş oluşturur
-    ve daha sonra email ile invoice atılabilir.
-    """
-    data = request.data
-
-    required_fields = [
-        "customer_name",
-        "customer_email",
-        "product_name",
-        "quantity",
-        "total_price",
-        "delivery_address",
-    ]
-
-    for field in required_fields:
-        if field not in data:
-            return Response(
-                {"error": f"Missing field: {field}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-    # Basit delivery & customer id üret
-    delivery_id = f"DEL-{uuid.uuid4().hex[:6].upper()}"
-    customer_id = data.get("customer_id") or f"CUST-{uuid.uuid4().hex[:6].upper()}"
-
-    order = Order.objects.create(
-        delivery_id=delivery_id,
-        customer_id=customer_id,
-        customer_name=data["customer_name"],
-        customer_email=data["customer_email"],
-        product_id=data.get("product_id"),
-        product_name=data["product_name"],
-        quantity=data["quantity"],
-        total_price=data["total_price"],
-        delivery_address=data["delivery_address"],
-        status="processing",
-        order_date=timezone.now().date(),
-    )
-
-    # Şimdilik email hatası olsa bile patlatma
-    try:
-        send_invoice_email(order)
-    except Exception as e:
-        print("Invoice email error:", e)
-
-    return Response({
-        "delivery_id": order.delivery_id,
-        "customer_name": order.customer_name,
-        "customer_email": order.customer_email,
-        "product_name": order.product_name,
-        "quantity": order.quantity,
-        "total_price": float(order.total_price),
-        "delivery_address": order.delivery_address,
-        "status": order.status,
-    }, status=status.HTTP_201_CREATED)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def dashboard_stats(request):
