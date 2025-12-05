@@ -111,15 +111,11 @@ function Cart() {
     totalQuantity,
   };
 
-  // Open payment modal OR redirect to Login
-  const handleCheckout = () => {
-    if (!isAuthenticated) {
-      // Logic Change: Redirect to login only when attempting to checkout
-      navigate('/login');
-    } else {
-      setShowPayment(true);
-    }
-  };
+// Open payment modal — login olsa da olmasa da ödeme ekranına geçsin
+const handleCheckout = () => {
+  setShowPayment(true);
+};
+
 
   // When payment is successful
   const handlePaymentSuccess = (newOrderId) => {
@@ -248,9 +244,9 @@ function Cart() {
             </div>
 
             <button onClick={handleCheckout} className="checkout-button">
-              {/* Change button text slightly to indicate next step */}
-              {isAuthenticated ? "Proceed to Payment" : "Login to Checkout"}
+            {"Proceed to Payment"}
             </button>
+
             <button
               onClick={() => navigate('/products')}
               className="continue-shopping"
