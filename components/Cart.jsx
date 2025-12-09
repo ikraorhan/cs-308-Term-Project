@@ -111,7 +111,6 @@ function Cart() {
     totalQuantity,
   };
 
-  // Open payment modal OR redirect to Login
   const handleCheckout = () => {
     if (!isAuthenticated) {
       // Logic Change: Redirect to login only when attempting to checkout
