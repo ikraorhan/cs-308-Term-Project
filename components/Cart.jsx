@@ -247,9 +247,9 @@ function Cart() {
             </div>
 
             <button onClick={handleCheckout} className="checkout-button">
-              {/* Change button text slightly to indicate next step */}
-              {isAuthenticated ? "Proceed to Payment" : "Login to Checkout"}
+            {"Proceed to Payment"}
             </button>
+
             <button
               onClick={() => navigate('/products')}
               className="continue-shopping"
