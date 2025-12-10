@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "./ProductCard";
 import "./Products.css";
-import { productsAPI } from "../product_manager_api";
+import { productManagerAPI } from "./api";
 
 const CATEGORIES = [
   "Food",
@@ -32,36 +32,115 @@ export default function Products({ showFilters = true, limit = null }) {
     }
   }, [searchParams, showFilters]);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-        const params = {};
-        // Only apply filters if showFilters is true
-        if (showFilters) {
-          if (selectedCategory) params.category = selectedCategory;
-          if (searchQuery) params.search = searchQuery;
-          if (sortBy) params.sort = sortBy;
-        }
+  // Function to load products (memoized with useCallback)
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = {};
+      // Only apply filters if showFilters is true
+      if (showFilters) {
+        if (selectedCategory) params.category = selectedCategory;
+        if (searchQuery) params.search = searchQuery;
+        if (sortBy) params.sort = sortBy;
+      }
 
-        const response = await productsAPI.getProducts(params);
-        let products = response?.data ?? [];
-        // If limit is set, only show first N products
-        if (limit && limit > 0) {
-          products = products.slice(0, limit);
-        }
-        setItems(Array.isArray(products) ? products : []);
-      } catch (err) {
-        console.error("Error loading products:", err);
-        setError("Failed to load products. Please try again.");
-        setItems([]);
-      } finally {
-        setLoading(false);
+      const response = await productManagerAPI.getManagerProducts();
+      console.log('📦 Products API Response:', response);
+      // Backend returns {products: [...], count: N}
+      let products = response.data?.products || response.data || [];
+      console.log('📦 Parsed products:', products.length, 'items');
+      if (products.length > 0) {
+        console.log('📦 First product:', products[0].name, '- Stock:', products[0]?.quantity_in_stock);
+        // Log all products with their stock for debugging
+        products.slice(0, 5).forEach(p => {
+          console.log(`  - ${p.name}: Stock = ${p.quantity_in_stock}`);
+        });
+      }
+      
+      // Apply filters client-side
+      if (showFilters && selectedCategory) {
+        products = products.filter(p => p.category === selectedCategory);
+      }
+      
+      if (showFilters && searchQuery) {
+        const searchTerm = searchQuery.toLowerCase();
+        products = products.filter(p => 
+          p.name.toLowerCase().includes(searchTerm) ||
+          (p.description && p.description.toLowerCase().includes(searchTerm))
+        );
+      }
+      
+      if (showFilters && sortBy === "price") {
+        products.sort((a, b) => a.price - b.price);
+      } else if (showFilters && sortBy === "popularity") {
+        products.sort((a, b) => (b.quantity_in_stock || 0) - (a.quantity_in_stock || 0));
+      }
+      
+      // If limit is set, only show first N products
+      if (limit && limit > 0) {
+        products = products.slice(0, limit);
+      }
+      setItems(Array.isArray(products) ? products : []);
+    } catch (err) {
+      console.error("Error loading products:", err);
+      setError("Failed to load products. Please try again.");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCategory, searchQuery, sortBy, showFilters, limit]);
+
+  // Load products when filters change OR when component mounts (check for orderSuccess flag)
+  useEffect(() => {
+    loadProducts();
+    
+    // Check if there was a recent order (within last 5 seconds)
+    const orderSuccessTime = localStorage.getItem('orderSuccess');
+    if (orderSuccessTime) {
+      const timeDiff = Date.now() - parseInt(orderSuccessTime);
+      if (timeDiff < 5000) { // Order was within last 5 seconds
+        console.log('🔄 Recent order detected - refreshing products');
+        loadProducts();
+        // Clear the flag after using it
+        localStorage.removeItem('orderSuccess');
       }
     }
-    load();
-  }, [selectedCategory, searchQuery, sortBy, showFilters, limit]);
+  }, [selectedCategory, searchQuery, sortBy, showFilters, limit, loadProducts]);
+
+  // Refresh products when page becomes visible (after order, etc.)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Page became visible, refresh products to get updated stock
+        console.log('🔄 Visibility changed - refreshing products');
+        loadProducts();
+      }
+    };
+
+    const handleFocus = () => {
+      // Window gained focus, refresh products
+      console.log('🔄 Window focused - refreshing products');
+      loadProducts();
+    };
+
+    // Listen to custom event from payment success
+    const handleOrderSuccess = () => {
+      console.log('🔄 Order success event received - refreshing products');
+      loadProducts();
+    };
+
+    // Listen to visibility change and focus events
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('orderSuccess', handleOrderSuccess);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('orderSuccess', handleOrderSuccess);
+    };
+  }, [loadProducts]); // Include loadProducts in deps
 
   const handleSearch = (e) => {
     e.preventDefault();

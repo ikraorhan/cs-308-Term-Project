@@ -324,7 +324,9 @@ export const productManagerAPI = {
    * Get all products for management
    */
   async getManagerProducts() {
-    return productManagerRequest('/products/');
+    // Add cache-busting timestamp to ensure fresh data after stock updates
+    const timestamp = new Date().getTime();
+    return productManagerRequest(`/products/?_t=${timestamp}`);
   },
 
   /**

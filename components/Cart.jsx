@@ -147,6 +147,10 @@ const handleCheckout = () => {
     localStorage.removeItem('cart_items');
     
     setShowPayment(false);
+    
+    // Dispatch event to refresh products before navigating
+    window.dispatchEvent(new Event('orderSuccess'));
+    
     setTimeout(() => {
       navigate('/profile');
     }, 100);

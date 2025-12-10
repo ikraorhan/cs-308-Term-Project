@@ -131,6 +131,13 @@ export default function PaymentMockFlow({
       // İlk ürünün ID'sini kullan (veya 0)
       const firstProductId = cartItems.length > 0 ? (cartItems[0].id || cartItems[0].product_id || 0) : 0;
       
+      // DEBUG: Console'a yazdır (stok kontrolü için)
+      console.log('📦 Order Data:', {
+        product_id: firstProductId,
+        quantity: totalQuantity,
+        cartItems: cartItems.map(item => ({ id: item.id, name: item.name }))
+      });
+      
       const orderData = {
         customer_name: userName,
         customer_email: userEmail,
@@ -192,6 +199,11 @@ export default function PaymentMockFlow({
       // React state güncellemesi asenkron olduğu için 'order' prop'u yerine
       // burada oluşturduğumuz 'fullOrderData'yı kullanıyoruz.
       sendOrderEmail(mainOrderId, amount, fullOrderData);
+      
+      // Trigger event to refresh products (stock updated)
+      window.dispatchEvent(new Event('orderSuccess'));
+      // Also set a flag in localStorage so Products component can check on mount
+      localStorage.setItem('orderSuccess', Date.now().toString());
       
     } catch (error) {
       console.error('Error creating order:', error);
