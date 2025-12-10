@@ -6,9 +6,22 @@ from .models import Product, Order, Review
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'model', 'category', 'price', 'quantity_in_stock', 'created_at')
-    list_filter = ('category', 'created_at')
-    search_fields = ('name', 'model', 'serial_number', 'description')
+    # Tüm gerekli kolonlar list display'de görünecek
+    list_display = (
+        'id', 
+        'name', 
+        'model', 
+        'serial_number',
+        'description',
+        'quantity_in_stock', 
+        'price',
+        'warranty_status',
+        'distributor',
+        'category',
+        'created_at'
+    )
+    list_filter = ('category', 'warranty_status', 'distributor', 'created_at')
+    search_fields = ('name', 'model', 'serial_number', 'description', 'warranty_status', 'distributor', 'category')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Basic Information', {

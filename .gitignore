@@ -5,6 +5,16 @@ db 2.sqlite3
 # Python bytecode
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.py[cod]
+*$py.class
 
 # Node modules
 node_modules/
