@@ -173,7 +173,7 @@ def product_list_create(request):
                 "distributor": p.distributor,
                 "category": p.category,
                 "cost": float(p.cost) if p.cost else None,
-                "image_url": "https://via.placeholder.com/300x300?text=Product" # Placeholder for now
+                "image_url": p.image_url if p.image_url else "https://via.placeholder.com/300x300?text=Product"
             })
 
         # Apply sorting
@@ -203,7 +203,8 @@ def product_list_create(request):
                 warranty_status=request.data.get('warranty_status', ''),
                 distributor=request.data.get('distributor', ''),
                 category=request.data.get('category', ''),
-                cost=float(request.data.get('cost')) if request.data.get('cost') else None
+                cost=float(request.data.get('cost')) if request.data.get('cost') else None,
+                image_url=request.data.get('image_url', '')
             )
             
             new_product = {
@@ -217,7 +218,8 @@ def product_list_create(request):
                 "warranty_status": p.warranty_status,
                 "distributor": p.distributor,
                 "category": p.category,
-                "cost": float(p.cost) if p.cost else None
+                "cost": float(p.cost) if p.cost else None,
+                "image_url": p.image_url
             }
             return Response(new_product, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -242,7 +244,7 @@ def product_detail(request, product_id):
             "distributor": product.distributor,
             "category": product.category,
             "cost": float(product.cost) if product.cost else None,
-            "image_url": "https://via.placeholder.com/300x300?text=Product"
+            "image_url": product.image_url if product.image_url else "https://via.placeholder.com/300x300?text=Product"
         }
         return Response(product_data, status=status.HTTP_200_OK)
     
@@ -253,6 +255,7 @@ def product_detail(request, product_id):
             if 'description' in request.data: product.description = request.data['description']
             if 'price' in request.data: product.price = float(request.data['price'])
             if 'quantity_in_stock' in request.data: product.quantity_in_stock = int(request.data['quantity_in_stock'])
+            if 'image_url' in request.data: product.image_url = request.data['image_url']
             # Add other fields as needed
             
             product.save()
@@ -262,6 +265,7 @@ def product_detail(request, product_id):
                 "name": product.name,
                 "quantity_in_stock": product.quantity_in_stock,
                 "price": float(product.price),
+                "image_url": product.image_url,
                 # ...
             }
             return Response(product_data, status=status.HTTP_200_OK)
