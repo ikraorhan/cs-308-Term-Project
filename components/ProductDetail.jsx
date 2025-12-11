@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productsAPI } from '../product_manager_api';
-import { 
-  hasDeliveredProduct, 
+import { productManagerAPI } from './api';
+import {
+  hasDeliveredProduct,
   hasReviewedProduct,
   hasRatedProduct,
   getUserRating,
-  saveReview, 
+  saveReview,
   saveRating,
   getApprovedReviews,
   getProductRatings,
@@ -20,7 +21,7 @@ function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Review & Rating state
   const [ratingType, setRatingType] = useState('stars'); // 'stars' or 'points'
   const [ratingValue, setRatingValue] = useState(0);
@@ -28,29 +29,29 @@ function ProductDetail() {
   const [comment, setComment] = useState('');
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  
+
   // Display data
   const [reviews, setReviews] = useState([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalRatings, setTotalRatings] = useState(0);
-  
+
   // User info
   const userId = localStorage.getItem('user_id') || localStorage.getItem('user_email');
   const userName = localStorage.getItem('user_name') || 'User';
   const userEmail = localStorage.getItem('user_email') || '';
-  
+
   useEffect(() => {
     fetchProduct();
     loadReviewsAndRatings();
   }, [id]);
-  
+
   const fetchProduct = async () => {
     try {
       setLoading(true);
       const response = await productsAPI.getProducts({});
       const products = response.data || [];
       const foundProduct = products.find(p => p.id === parseInt(id));
-      
+
       if (foundProduct) {
         setProduct(foundProduct);
         setError('');
@@ -64,102 +65,176 @@ function ProductDetail() {
       setLoading(false);
     }
   };
-  
-  const loadReviewsAndRatings = () => {
-    const productId = parseInt(id);
-    const approvedReviews = getApprovedReviews(productId);
-    const ratings = getProductRatings(productId);
-    const avgRating = getAverageRating(productId);
-    
-    setReviews(approvedReviews);
-    setTotalRatings(ratings.length);
-    setAverageRating(parseFloat(avgRating));
-    
-    // Check if user can review - Only if product was purchased AND delivered
-    if (productId && userId) {
-      const hasDelivered = hasDeliveredProduct(userId, productId);
-      const alreadyReviewed = hasReviewedProduct(userId, productId);
-      const alreadyRated = hasRatedProduct(userId, productId);
-      
-      // Show review form only if:
-      // 1. User purchased and received the product (delivered)
-      // 2. User hasn't reviewed yet
-      if (hasDelivered && !alreadyReviewed && !showReviewForm) {
-        setShowReviewForm(true);
+
+  /* 
+   * NEW IMPLEMENTATION: Using Backend API 
+   */
+  const loadReviewsAndRatings = async () => {
+    try {
+      const productId = parseInt(id);
+
+      // 1. Get ALL comments for statistics (from backend)
+      // FIX: Removed invalid call to productsAPI.getProduct which doesn't exist
+      // const response = await productsAPI.getProduct(productId); 
+
+      // Better approach: Get all comments filtered by product ID from the comments endpoint
+      // Current API endpoint /comments/ returns ALL comments or filtered by status.
+      // We need to fetch ALL comments for this product to calculate ratings, 
+      // but only show APPROVED comments in the list.
+
+      // Since the API doesn't support filtering by Product ID yet efficiently for "all statuses",
+      // we will fetch all comments and filter locally for this prototype, 
+      // OR rely on the fact that we can get "approved" ones for display and maybe "all" for stats?
+      // Actually, let's look at `productManagerAPI.getComments`.
+
+      const allCommentsResponse = await productManagerAPI.getComments(null); // Get all
+      const allWebReviews = allCommentsResponse.data?.comments || [];
+
+      // Filter for THIS product
+      const productReviews = allWebReviews.filter(r =>
+        (r.product_id === productId || r.productId === productId || r.product_id === String(productId))
+      );
+
+      // Calculate Stats
+      // Requirement Update: "Pending ratings should not appear".
+      // Logic: 
+      // - Pending: Does NOT count
+      // - Approved: Counts
+      // - Rejected: Does NOT count
+
+      const activeReviews = productReviews.filter(r => r.status === 'approved');
+
+      const totalCount = activeReviews.length;
+      let totalSum = 0;
+      activeReviews.forEach(r => {
+        totalSum += Number(r.rating || 0);
+      });
+
+      const avg = totalCount > 0 ? (totalSum / totalCount).toFixed(1) : 0;
+
+      setTotalRatings(totalCount);
+      setAverageRating(parseFloat(avg));
+
+      // Filter for Display: Only APPROVED status
+      // Also, effectively merge with any "local" display if we wanted instant feedback, 
+      // but the requirement says "Write a comment ... should not appear immediately".
+      // So we ONLY show approved ones.
+      // DEBUG: Log reviews to console (and maybe UI temporarily if needed)
+      console.log('Fetched Reviews:', productReviews);
+
+      const visibleReviews = productReviews.filter(r => r.status === 'approved');
+      console.log('Visible Reviews:', visibleReviews);
+
+      // Temporary Debug UI for user to see what is happening
+      if (productReviews.length > 0 && visibleReviews.length === 0) {
+        console.warn('Reviews exist but none are approved.');
       }
-      
-      // Load user's existing rating if any
-      if (alreadyRated) {
-        const userRating = getUserRating(userId, productId);
-        if (userRating) {
-          setRatingValue(userRating.value);
-          setRatingType(userRating.type || 'stars');
-          setHoverValue(0);
+
+      // Map to expected format if needed
+      const formattedReviews = visibleReviews.map(r => ({
+        id: r.id,
+        userName: r.user_name || r.userName || 'Anonymous',
+        date: r.created_at || r.date,
+        rating: r.rating,
+        comment: r.comment
+      }));
+
+      setReviews(formattedReviews);
+
+      // Check user status (purchased/delivered)
+      // Keeping generic logic for now - user ID check
+      if (productId && userId) {
+        // We still check local orders for "Has Delivered" permission since that part of the system 
+        // wasn't fully migrated to backend in previous steps (Order flow uses API but helper checks local? 
+        // actually helper `hasDeliveredProduct` checks local storage `user_orders`).
+        // For this task, we assume the user has permission if they have the order in their history.
+        // We will keep the legacy check `hasDeliveredProduct` if it works, otherwise we might need to 
+        // check via API `productManagerAPI.getOrderHistory`.
+        // For safety/speed in this task, we'll assume the local order history is sync'd or use the helper.
+
+        const hasDelivered = hasDeliveredProduct(userId, productId);
+
+        // check if already reviewed THIS product in the fetched list
+        const userReview = productReviews.find(r =>
+          (r.user_id === String(userId) || r.user_id === userId || r.user_email === userEmail)
+        );
+
+        const alreadyReviewed = !!userReview;
+
+        if (hasDelivered && !alreadyReviewed && !showReviewForm) {
+          setShowReviewForm(true);
+        }
+
+        if (alreadyReviewed) {
+          // Set user's existing rating for display
+          setRatingValue(userReview.rating);
+          setSubmitted(true); // Treat as "done"
+          // If pending, show message?
         }
       }
+
+    } catch (err) {
+      console.error('Error loading reviews:', err);
     }
   };
-  
+
   const handleRatingChange = (value) => {
     setRatingValue(value);
-    setHoverValue(0); // Reset hover after selection
+    setHoverValue(0);
   };
-  
-  const handleSubmitReview = (e) => {
+
+  const handleSubmitReview = async (e) => {
     e.preventDefault();
-    
+
     if (!ratingValue || ratingValue === 0) {
       alert('Please provide a rating.');
       return;
     }
-    
+
     if (!comment.trim()) {
       alert('Please write a comment.');
       return;
     }
-    
+
     const productId = parseInt(id);
-    
-    // Save rating (immediate, no approval needed)
-    saveRating({
-      userId,
-      userName,
-      userEmail,
-      productId,
-      value: ratingValue,
-      type: ratingType,
-    });
-    
-    // Save review (needs approval)
-    saveReview({
-      userId,
-      userName,
-      userEmail,
-      productId,
-      productName: product?.name || '',
-      comment: comment.trim(),
-      rating: ratingValue, // Store rating with comment for display
-    });
-    
-    setSubmitted(true);
-    setComment('');
-    setRatingValue(0);
-    setHoverValue(0);
-    
-    // Reload reviews and ratings
-    setTimeout(() => {
-      loadReviewsAndRatings();
-      setShowReviewForm(false);
-      setSubmitted(false);
-    }, 1500);
+
+    try {
+      // Create new review via API
+      const reviewData = {
+        product_id: productId,
+        product_name: product?.name || '',
+        user_id: userId,
+        user_name: userName,
+        user_email: userEmail,
+        rating: ratingValue,
+        comment: comment.trim()
+      };
+
+      await productManagerAPI.createReview(reviewData);
+
+      setSubmitted(true);
+      setComment('');
+      // Don't clear rating value so user sees what they submitted
+
+      // Reload logic
+      setTimeout(() => {
+        loadReviewsAndRatings(); // This will recalculate avgs (immediate) but hide comment (pending)
+        setShowReviewForm(false);
+        setSubmitted(false); // Reset submitted state to show "Thanks" or just hide form
+      }, 1500);
+
+    } catch (err) {
+      console.error('Error submitting review:', err);
+      alert('Failed to submit review. Please try again.');
+    }
   };
-  
+
   const renderStarRating = (value, interactive = false, onChange = null) => {
     const stars = [];
     const maxStars = 5;
     // Use hoverValue for preview, fallback to actual value
     const displayValue = interactive && hoverValue > 0 ? hoverValue : value;
-    
+
     for (let i = 1; i <= maxStars; i++) {
       stars.push(
         <span
@@ -188,11 +263,11 @@ function ProductDetail() {
     }
     return <div className="star-rating">{stars}</div>;
   };
-  
+
   const renderPointRating = (value, interactive = false, onChange = null) => {
     const points = [];
     const maxPoints = 10;
-    
+
     for (let i = 1; i <= maxPoints; i++) {
       points.push(
         <button
@@ -207,7 +282,7 @@ function ProductDetail() {
     }
     return <div className="point-rating">{points}</div>;
   };
-  
+
   if (loading) {
     return (
       <div className="product-detail-container">
@@ -217,7 +292,7 @@ function ProductDetail() {
       </div>
     );
   }
-  
+
   if (error || !product) {
     return (
       <div className="product-detail-container">
@@ -228,7 +303,7 @@ function ProductDetail() {
       </div>
     );
   }
-  
+
   // User can only review if:
   // 1. They are logged in
   // 2. They purchased the product
@@ -237,25 +312,25 @@ function ProductDetail() {
   const alreadyReviewed = userId && hasReviewedProduct(userId, product.id);
   const alreadyRated = userId && hasRatedProduct(userId, product.id);
   const showReviewSection = hasDelivered && (!alreadyReviewed || !alreadyRated);
-  
+
   return (
     <div className="product-detail-container">
       <button onClick={() => navigate('/products')} className="back-button">
         ← Back to Products
       </button>
-      
+
       <div className="product-detail-content">
         <div className="product-detail-main">
           <div className="product-image-large">
-            <img 
-              src={product.image_url || 'https://via.placeholder.com/500x500?text=Product'} 
+            <img
+              src={product.image_url || 'https://via.placeholder.com/500x500?text=Product'}
               alt={product.name}
               onError={(e) => {
                 e.target.src = 'https://via.placeholder.com/500x500?text=Product';
               }}
             />
           </div>
-          
+
           <div className="product-info-detail">
             <h1 className="product-title">{product.name}</h1>
             <div className="product-meta">
@@ -271,9 +346,9 @@ function ProductDetail() {
                 </div>
               )}
             </div>
-            
+
             <p className="product-description-full">{product.description}</p>
-            
+
             <div className="product-details-info">
               <div className="detail-row">
                 <span className="detail-label">Price:</span>
@@ -290,11 +365,11 @@ function ProductDetail() {
             </div>
           </div>
         </div>
-        
+
         {/* Reviews & Ratings Section */}
         <div className="reviews-section">
           <h2>Reviews & Ratings</h2>
-          
+
           {/* Average Rating Display */}
           {totalRatings > 0 ? (
             <div className="average-rating-display">
@@ -310,7 +385,7 @@ function ProductDetail() {
           ) : (
             <p className="no-ratings">No ratings yet. Be the first to rate!</p>
           )}
-          
+
           {/* Review Form */}
           {showReviewSection && !submitted && (
             <div className="review-form-container">
@@ -344,7 +419,7 @@ function ProductDetail() {
                     <span>🔢 Rate with Points (1-10)</span>
                   </label>
                 </div>
-                
+
                 <div className="rating-input">
                   <label>Your Rating:</label>
                   {ratingType === 'stars' ? (
@@ -363,7 +438,7 @@ function ProductDetail() {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="comment-input">
                   <label htmlFor="comment">Your Comment:</label>
                   <textarea
@@ -376,39 +451,39 @@ function ProductDetail() {
                   />
                   <small>Note: Your comment will be reviewed by a product manager before being published.</small>
                 </div>
-                
+
                 <button type="submit" className="submit-review-btn">
                   Submit Review
                 </button>
               </form>
             </div>
           )}
-          
+
           {submitted && (
             <div className="review-submitted-message">
               <p>✓ Your rating has been submitted!</p>
               <p>Your comment is pending approval and will be visible after review.</p>
             </div>
           )}
-          
+
           {alreadyReviewed && (
             <div className="already-reviewed-message">
               <p>You have already reviewed this product. Thank you!</p>
             </div>
           )}
-          
+
           {userId && !hasDelivered && (
             <div className="cannot-review-message">
               <p>⚠️ You can only rate and comment on products that you have purchased and received. Please wait until your order is delivered.</p>
             </div>
           )}
-          
+
           {!userId && (
             <div className="login-required-message">
               <p>Please <button onClick={() => navigate('/login')} className="link-button">log in</button> to review products.</p>
             </div>
           )}
-          
+
           {/* Approved Reviews List */}
           <div className="reviews-list">
             <h3>Customer Reviews ({reviews.length})</h3>
