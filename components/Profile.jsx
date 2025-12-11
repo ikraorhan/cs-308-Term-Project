@@ -425,10 +425,6 @@ function Profile() {
                 View Order History
               </button>
             </div>
-            <p>Track deliveries and reorder your favourites in one tap.</p>
-            <Link to="/order-history" className="view-all-orders-link">
-              View All Orders →
-            </Link>
           </header>
           <div className="order-list">
 

@@ -122,44 +122,41 @@ export default function PaymentMockFlow({
         return;
       }
       
-      const orderIds = [];
-      // Basitlik için ilk item'ın bilgileriyle dummy bir yapı kuralım veya API'den döneni bekleyelim.
-      // Ancak invoice oluşturmak için elimizde tüm verinin hazır olması lazım.
+      // Tüm ürünleri tek bir sipariş olarak birleştir
+      const totalQuantity = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+      const productNames = cartItems.map(item => 
+        `${item.name || item.product_name || 'Product'} (x${item.quantity || 1})`
+      ).join(', ');
       
-      for (const item of cartItems) {
-        const orderData = {
-          customer_name: userName,
-          customer_email: userEmail,
-          product_name: item.name || item.product_name || 'Product',
-          product_id: item.id || item.product_id || 0,
-          quantity: item.quantity || 1,
-          total_price: (item.price || 0) * (item.quantity || 1),
-          delivery_address: deliveryAddress
-        };
-        
-        const orderResponse = await fetch('http://localhost:8000/orders/create/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(orderData)
-        });
-        
-        if (!orderResponse.ok) {
-          console.error('Order creation failed for item:', item.name);
-          continue;
-        }
-        
+      // İlk ürünün ID'sini kullan (veya 0)
+      const firstProductId = cartItems.length > 0 ? (cartItems[0].id || cartItems[0].product_id || 0) : 0;
+      
+      const orderData = {
+        customer_name: userName,
+        customer_email: userEmail,
+        product_name: productNames, // Tüm ürünlerin birleşik adı
+        product_id: firstProductId,
+        quantity: totalQuantity, // Toplam miktar
+        total_price: amount, // Toplam fiyat
+        delivery_address: deliveryAddress
+      };
+      
+      const orderResponse = await fetch('http://localhost:8000/orders/create/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData)
+      });
+      
+      let mainOrderId;
+      if (orderResponse.ok) {
         const orderResult = await orderResponse.json();
-        const createdId = orderResult.order?.delivery_id || orderResult.delivery_id;
-        if (createdId) {
-          orderIds.push(createdId);
-        }
+        mainOrderId = orderResult.order?.delivery_id || orderResult.delivery_id;
+      } else {
+        console.error('Order creation failed');
+        mainOrderId = `INV-${Math.floor(Math.random() * 900000 + 100000)}`;
       }
-      
-      const mainOrderId = orderIds.length > 0 
-        ? orderIds[0] 
-        : `INV-${Math.floor(Math.random() * 900000 + 100000)}`;
       
       setOrderId(mainOrderId);
       

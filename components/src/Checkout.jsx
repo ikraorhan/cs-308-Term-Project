@@ -7,15 +7,23 @@ export default function Checkout() {
   const navigate = useNavigate();
 
   const placeOrder = async () => {
+    // Tüm ürünleri tek bir sipariş olarak birleştir
+    const totalQuantity = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
+    const productNames = cart.map(item => 
+      `${item.name || 'Product'} (x${item.qty || 1})`
+    ).join(', ');
+    
+    // İlk ürünün ID'sini kullan (veya 0)
+    const firstProductId = cart.length > 0 ? (cart[0].id || 0) : 0;
+    
     const orderData = {
       customer_name: "Demo User",
       customer_email: "demo@example.com",
       delivery_address: "Test Address 123",
-      total_price: total,
-      orders: cart.map((item) => ({
-        product_id: item.id,
-        quantity: item.qty,
-      })),
+      product_name: productNames, // Tüm ürünlerin birleşik adı
+      product_id: firstProductId,
+      quantity: totalQuantity, // Toplam miktar
+      total_price: total, // Toplam fiyat
     };
 
     try {

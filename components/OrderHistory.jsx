@@ -102,7 +102,7 @@ function OrderHistory() {
     try {
       return new Intl.DateTimeFormat('en-GB', {
         year: 'numeric',
-        month: 'long',
+        month: 'short',
         day: 'numeric',
       }).format(new Date(dateString));
     } catch (error) {
@@ -180,32 +180,31 @@ function OrderHistory() {
                 </div>
 
                 <div className="order-card-body">
-                  <div className="order-info-row">
-                    <div className="order-info-item">
-                      <span className="info-label">Product</span>
-                      <span className="info-value">{order.product_name}</span>
-                    </div>
-                    <div className="order-info-item">
-                      <span className="info-label">Quantity</span>
-                      <span className="info-value">×{order.quantity}</span>
-                    </div>
+                  <div className="order-info-item full-width product-row">
+                    <span className="info-label">Product:</span>
+                    <span className="info-value">{order.product_name}</span>
+                  </div>
+
+                  <div className="order-info-item inline-row">
+                    <span className="info-label">Quantity:</span>
+                    <span className="info-value">×{order.quantity}</span>
                   </div>
 
                   <div className="order-info-row">
-                    <div className="order-info-item">
-                      <span className="info-label">Order Date</span>
+                    <div className="order-info-item inline-row">
+                      <span className="info-label">Order Date:</span>
                       <span className="info-value">{formatDate(order.order_date)}</span>
                     </div>
                     {order.delivery_date && (
-                      <div className="order-info-item">
-                        <span className="info-label">Delivery Date</span>
+                      <div className="order-info-item inline-row">
+                        <span className="info-label">Delivery Date:</span>
                         <span className="info-value">{formatDate(order.delivery_date)}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="order-info-item full-width">
-                    <span className="info-label">Delivery Address</span>
+                  <div className="order-info-item full-width inline-row">
+                    <span className="info-label">Delivery Address:</span>
                     <span className="info-value address">{order.delivery_address}</span>
                   </div>
                 </div>
