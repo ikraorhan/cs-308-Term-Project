@@ -96,13 +96,13 @@ function ProductDetail() {
       );
 
       // Calculate Stats
-      // Requirement Update: "Pending ratings should not appear".
+      // Requirement Update: "Pending ratings SHOULD appear immediately".
       // Logic: 
-      // - Pending: Does NOT count
+      // - Pending: Counts
       // - Approved: Counts
       // - Rejected: Does NOT count
 
-      const activeReviews = productReviews.filter(r => r.status === 'approved');
+      const activeReviews = productReviews.filter(r => r.status !== 'rejected');
 
       const totalCount = activeReviews.length;
       let totalSum = 0;

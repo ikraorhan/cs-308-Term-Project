@@ -9,6 +9,8 @@ from rest_framework import status
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 import json
+from django.db.models import Avg, Q, Value
+from django.db.models.functions import Coalesce
 from .models import Product # Import Product model
 
 # Import Review and Order models
@@ -159,8 +161,23 @@ def product_list_create(request):
         products_queryset = Product.objects.all()
         products = []
         
-        # Convert to dictionary format or use serializer (doing manual dict for now to match structure)
+        # Pre-fetch all reviews to avoid N+1 queries
+        # We need ALL reviews (pending, approved, rejected) for the popularity sort as requested
+        product_ratings = {}
+        if USE_DATABASE and Review:
+            all_reviews = Review.objects.all().values('product_id', 'rating')
+            for r in all_reviews:
+                pid = r['product_id']
+                if pid not in product_ratings:
+                    product_ratings[pid] = []
+                product_ratings[pid].append(r['rating'])
+        
+        # Convert to dictionary format
         for p in products_queryset:
+            # Calculate average rating from pre-fetched data
+            ratings = product_ratings.get(p.id, [])
+            avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
+
             products.append({
                 "id": p.id,
                 "name": p.name,
@@ -173,7 +190,8 @@ def product_list_create(request):
                 "distributor": p.distributor,
                 "category": p.category,
                 "cost": float(p.cost) if p.cost else None,
-                "image_url": p.image_url if p.image_url else "https://via.placeholder.com/300x300?text=Product"
+                "image_url": p.image_url if p.image_url else "https://via.placeholder.com/300x300?text=Product",
+                "average_rating": float(avg_rating)
             })
 
         # Apply sorting
@@ -181,9 +199,8 @@ def product_list_create(request):
             # Sort by price ascending, then by name
             products.sort(key=lambda p: (float(p.get('price', 0)), p.get('name', '').lower()))
         elif sort_option == 'popularity':
-            # Sort by popularity (stock quantity descending - highest stock = most popular), then by name
-            # Using negative value to sort descending (highest first)
-            products.sort(key=lambda p: (-int(p.get('quantity_in_stock', 0)), p.get('name', '').lower()))
+            # Sort by average_rating descending, then by name
+            products.sort(key=lambda p: (float(p.get('average_rating', 0) or 0), p.get('name', '').lower()), reverse=True)
         
         return Response({
             'products': products,

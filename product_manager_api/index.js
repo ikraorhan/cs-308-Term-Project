@@ -39,12 +39,11 @@ export const productsAPI = {
         );
       }
 
-      // Sort filter
       if (params.sort === "price") {
         filteredProducts.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
       } else if (params.sort === "popularity") {
-        // Sort by stock quantity (higher stock = more popular)
-        filteredProducts.sort((a, b) => (b.quantity_in_stock || 0) - (a.quantity_in_stock || 0));
+        // Sort by average rating (descending)
+        filteredProducts.sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
       }
 
       return { data: filteredProducts };

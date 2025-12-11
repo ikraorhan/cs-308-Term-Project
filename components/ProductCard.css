@@ -66,6 +66,25 @@
   font-weight: 600;
 }
 
+.product-rating {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.star {
+  color: #fbbf24;
+  font-size: 16px;
+  margin-right: 2px;
+}
+
+.rating-value {
+  color: #6b7280;
+  font-size: 12px;
+  margin-left: 6px;
+  margin-top: 2px;
+}
+
 .product-description {
   color: #666;
   font-size: 14px;
