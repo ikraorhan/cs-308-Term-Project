@@ -3,10 +3,11 @@ Product Manager API Views
 Handles product management, stock management, order management, and comment approval
 """
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny  # TODO: Add proper authentication
+from rest_framework.permissions import AllowAny, IsAuthenticated  # TODO: Add proper authentication
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 import json
 
 # Mock data - Will be replaced with database in future sprints
@@ -405,16 +406,57 @@ except ImportError:
     Review = None
     Order = None
 
+@csrf_exempt
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def review_create(request):
-    """Create a new review/comment"""
+    """Create a new review/comment only if user purchased the product"""
+    user = request.user
+    product_id = request.data.get('product_id') or request.data.get('productId')
+
+    if not product_id:
+        return Response(
+            {'error': 'product_id is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if the authenticated user bought this product
+    purchased = False
+    if USE_DATABASE and Order:
+        purchased = Order.objects.filter(
+            customer_email=user.email,
+            product_id=product_id
+        ).exists()
+    else:
+        purchased = any(
+            str(o.get('customer_email', '')).lower() == str(user.email).lower()
+            and int(o.get('product_id', 0)) == int(product_id)
+            for o in MOCK_ORDERS
+        )
+
+    if not purchased:
+        return Response(
+            {'error': 'You can only submit comments for products you have purchased.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Determine if this is rating-only (no text) -> auto-approve
+    comment_text = (request.data.get('comment') or '').strip()
+    rating_value = request.data.get('rating', 5)
+    has_text = bool(comment_text)
+    initial_status = 'pending' if has_text else 'approved'
+
     if not USE_DATABASE or not Review:
         # Fallback to mock data
         new_review = {
             'id': len(MOCK_COMMENTS) + 1,
             **request.data,
-            'status': 'pending',
+            'user_id': user.id,
+            'user_name': user.get_full_name() or user.username,
+            'user_email': user.email,
+            'status': initial_status,
+            'comment': comment_text if has_text else '',
+            'rating': rating_value,
             'submitted_date': timezone.now().strftime('%Y-%m-%d')
         }
         MOCK_COMMENTS.append(new_review)
@@ -424,12 +466,12 @@ def review_create(request):
         review = Review.objects.create(
             product_id=request.data.get('product_id') or request.data.get('productId'),
             product_name=request.data.get('product_name') or request.data.get('productName', ''),
-            user_id=str(request.data.get('user_id') or request.data.get('userId', '')),
-            user_name=request.data.get('user_name') or request.data.get('userName', ''),
-            user_email=request.data.get('user_email') or request.data.get('userEmail', ''),
-            rating=request.data.get('rating', 5),
-            comment=request.data.get('comment', ''),
-            status='pending'
+            user_id=str(user.id),
+            user_name=user.get_full_name() or user.username,
+            user_email=user.email,
+            rating=rating_value,
+            comment=comment_text if has_text else '',
+            status=initial_status
         )
         
         return Response({
@@ -492,7 +534,8 @@ def comment_list(request):
         'pending_count': pending_count
     }, status=status.HTTP_200_OK)
 
-@api_view(['PUT'])
+@csrf_exempt
+@api_view(['PUT','GET'])
 @permission_classes([AllowAny])
 def comment_approve(request, comment_id):
     """Approve or reject a comment"""
