@@ -51,7 +51,7 @@ function getProductImage(product) {
     'leash': '/images/Automatic Retractable Leash 5m.jpg',
     
     // Bowls
-    'bowl': '/images/Stainless Steel Food Bowl (Cat:Small Dog).jpg',
+    'bowl': '/images/Stainless Steel Food Bowl (Cat-Small Dog).jpg',
     'ceramic': '/images/Non-Slip Ceramic Cat Bowl.jpg',
     'dual': '/images/Dual Compartment Plastic Food-Water Bowl.jpg',
     'water': '/images/Automatic Water Dispenser 1.5L.jpg',
@@ -65,7 +65,7 @@ function getProductImage(product) {
     
     // Grooming
     'shampoo': '/images/Dog Shampoo (Sensitive Skin).jpg',
-    'comb': '/images/Fur Comb (Cat:Dog).jpg',
+    'comb': '/images/Fur Comb (Cat-Dog).jpg',
     'wipe': '/images/Pet Cleaning Wipes (50 Pack).jpg',
     'cleaning': '/images/Pet Cleaning Wipes (50 Pack).jpg',
   };
