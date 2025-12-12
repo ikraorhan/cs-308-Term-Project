@@ -290,6 +290,10 @@ function ProductDetail() {
             </div>
             <p className="product-description-full">{product.description}</p>
             <div className="product-details-info">
+              <div className="detail-row"><span className="detail-label">Model:</span><span className="detail-value">{product.model}</span></div>
+              <div className="detail-row"><span className="detail-label">Serial Number:</span><span className="detail-value">{product.serial_number}</span></div>
+              <div className="detail-row"><span className="detail-label">Warranty:</span><span className="detail-value">{product.warranty_status}</span></div>
+              <div className="detail-row"><span className="detail-label">Distributor:</span><span className="detail-value">{product.distributor}</span></div>
               <div className="detail-row"><span className="detail-label">Price:</span><span className="detail-value price-value">₺{product.price.toFixed(2)}</span></div>
               <div className="detail-row"><span className="detail-label">In Stock:</span><span className={`detail-value ${product.quantity_in_stock === 0 ? 'out-of-stock' : ''}`}>{product.quantity_in_stock}</span></div>
             </div>
