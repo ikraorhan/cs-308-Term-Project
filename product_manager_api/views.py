@@ -386,11 +386,17 @@ def stock_update(request, product_id):
 def order_list(request):
     """Get all orders/deliveries"""
     status_filter = request.query_params.get('status')
+    email_filter = request.query_params.get('email')
+    product_filter = request.query_params.get('product_id')
     
     if USE_DATABASE and Order:
         orders_query = Order.objects.all().order_by('-order_date', '-created_at')
         if status_filter:
             orders_query = orders_query.filter(status=status_filter)
+        if email_filter:
+            orders_query = orders_query.filter(customer_email=email_filter)
+        if product_filter:
+            orders_query = orders_query.filter(product_id=product_filter)
             
         orders_data = [{
             'delivery_id': o.delivery_id,
@@ -561,16 +567,6 @@ def order_update_status(request, delivery_id):
         
     return Response(order, status=status.HTTP_200_OK)
 
-# Comment Approval
-# Import Review and Order models
-try:
-    from .models import Review, Order
-    USE_DATABASE = True
-except ImportError:
-    USE_DATABASE = False
-    Review = None
-    Order = None
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def review_create(request):
@@ -587,12 +583,26 @@ def review_create(request):
         return Response(new_review, status=status.HTTP_201_CREATED)
     
     try:
+        user_email = request.data.get('user_email') or request.data.get('userEmail')
+        product_id = request.data.get('product_id') or request.data.get('productId')
+        
+        # Validation: Check if user has purchased this product and it is delivered
+        if not Order.objects.filter(
+            customer_email=user_email,
+            product_id=product_id,
+            status='delivered'
+        ).exists():
+            return Response(
+                {'error': 'You can review products you bought after they are delivered.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         review = Review.objects.create(
-            product_id=request.data.get('product_id') or request.data.get('productId'),
+            product_id=product_id,
             product_name=request.data.get('product_name') or request.data.get('productName', ''),
             user_id=str(request.data.get('user_id') or request.data.get('userId', '')),
             user_name=request.data.get('user_name') or request.data.get('userName', ''),
-            user_email=request.data.get('user_email') or request.data.get('userEmail', ''),
+            user_email=user_email,
             rating=request.data.get('rating', 5),
             comment=request.data.get('comment', ''),
             status='pending'
