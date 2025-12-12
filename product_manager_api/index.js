@@ -7,50 +7,29 @@ const API_BASE_URL = "http://localhost:8000";
 export const productsAPI = {
   async getProducts(params = {}) {
     try {
-      // 1. Fetch live data from backend
-      const response = await fetch(`${API_BASE_URL}/products/`);
+      // Construct URLSearchParams from params
+      const queryParams = new URLSearchParams();
+      if (params.category) queryParams.append('category', params.category);
+      if (params.search) queryParams.append('search', params.search);
+      if (params.sort) queryParams.append('sort', params.sort);
+
+      const queryString = queryParams.toString();
+      const url = `${API_BASE_URL}/products/${queryString ? `?${queryString}` : ''}`;
+
+      // 1. Fetch live data from backend with params
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.statusText}`);
       }
 
       const result = await response.json();
-      let liveProducts = result.products || [];
-
-
-
-      // 3. Apply Filtering Locally (matching previous behavior)
-      let filteredProducts = [...liveProducts];
-
-      // Category filter
-      if (params.category) {
-        filteredProducts = filteredProducts.filter(
-          (p) => p.category === params.category
-        );
-      }
-
-      // Search filter
-      if (params.search) {
-        const searchTerm = params.search.toLowerCase();
-        filteredProducts = filteredProducts.filter(
-          (p) =>
-            (p.name || "").toLowerCase().includes(searchTerm) ||
-            (p.description || "").toLowerCase().includes(searchTerm)
-        );
-      }
-
-      if (params.sort === "price") {
-        filteredProducts.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
-      } else if (params.sort === "popularity") {
-        // Sort by average rating (descending)
-        filteredProducts.sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
-      }
-
-      return { data: filteredProducts };
+      return { data: result.products || [] };
 
     } catch (error) {
-      console.error("Failed to fetch products from API, falling back to empty list:", error);
+      console.error("Failed to fetch products from API:", error);
       return { data: [] };
     }
   },
 };
+

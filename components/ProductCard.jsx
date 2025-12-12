@@ -23,14 +23,21 @@ function ProductCard({ product }) {
 
   const renderStars = (rating) => {
     const stars = [];
-    const fullStars = Math.floor(rating || 0);
-    const hasHalfStar = (rating || 0) % 1 >= 0.5;
+    const safeRating = rating || 0;
 
     for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(<span key={i} className="star filled">★</span>);
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(<span key={i} className="star filled">★</span>); // Using full star for simplicity or could use unicode half star if font supports
+      const fillPercentage = Math.min(100, Math.max(0, (safeRating - i) * 100));
+
+      if (fillPercentage > 0) {
+        stars.push(
+          <span
+            key={i}
+            className="star filled"
+            style={{ '--percent': `${fillPercentage}%` }}
+          >
+            ★
+          </span>
+        );
       } else {
         stars.push(<span key={i} className="star">★</span>);
       }

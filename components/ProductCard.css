@@ -72,14 +72,24 @@
   margin-bottom: 8px;
 }
 
+/* Base star styling */
 .star {
-  color: #d1d5db;
   font-size: 16px;
   margin-right: 2px;
+  color: #d1d5db;
+  /* Default grey background for empty part */
+  display: inline-block;
+  position: relative;
 }
 
+/* Filled star using gradient - background clip text technique */
 .star.filled {
-  color: #fbbf24;
+  background: linear-gradient(90deg, #fbbf24 var(--percent, 100%), #d1d5db var(--percent, 100%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  /* Fallback */
 }
 
 .rating-value {

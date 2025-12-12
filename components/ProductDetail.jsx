@@ -233,10 +233,29 @@ function ProductDetail() {
     const displayValue = interactive && hoverValue > 0 ? hoverValue : value;
 
     for (let i = 1; i <= maxStars; i++) {
+      let isFilled = false;
+      let fillPercentage = 0;
+
+      if (interactive) {
+        // Integer based for input
+        isFilled = i <= displayValue;
+        fillPercentage = isFilled ? 100 : 0;
+      } else {
+        // Fractional for display
+        if (value >= i) {
+          fillPercentage = 100;
+          isFilled = true;
+        } else if (value > i - 1) {
+          fillPercentage = (value - (i - 1)) * 100;
+          isFilled = true; // Still marked filled to apply gradient
+        }
+      }
+
       stars.push(
         <span
           key={i}
-          className={`star ${i <= displayValue ? 'filled' : ''} ${interactive ? 'interactive' : ''}`}
+          className={`star ${isFilled ? 'filled' : ''} ${interactive ? 'interactive' : ''}`}
+          style={{ '--percent': `${fillPercentage}%` }}
           onClick={() => interactive && onChange && onChange(i)}
           onMouseEnter={() => interactive && setHoverValue(i)}
           onMouseLeave={() => interactive && setHoverValue(0)}
@@ -291,7 +310,7 @@ function ProductDetail() {
               <span className="product-category-badge">{product.category}</span>
               {totalRatings > 0 && (
                 <div className="product-rating-summary">
-                  <span className="rating-stars-display">{renderStarRating(Math.round(averageRating))}</span>
+                  <span className="rating-stars-display">{renderStarRating(averageRating)}</span>
                   <span className="rating-text">{averageRating}/5 ({totalRatings} {totalRatings === 1 ? 'rating' : 'ratings'})</span>
                 </div>
               )}
@@ -322,7 +341,7 @@ function ProductDetail() {
           {totalRatings > 0 ? (
             <div className="average-rating-display">
               <div className="avg-rating-main"><span className="avg-rating-value">{averageRating}</span><span className="avg-rating-max">/5</span></div>
-              <div className="avg-rating-stars">{renderStarRating(Math.round(averageRating))}</div>
+              <div className="avg-rating-stars">{renderStarRating(averageRating)}</div>
               <p className="avg-rating-count">{totalRatings} ratings</p>
             </div>
           ) : (<p className="no-ratings">No ratings yet.</p>)}

@@ -154,11 +154,31 @@ MOCK_CATEGORIES = ["Food", "Accessories", "Housing", "Toys", "Health"]
 def product_list_create(request):
     """Get all products or create a new product"""
     if request.method == 'GET':
+        from urllib.parse import unquote
         # Get sort parameter
-        sort_option = request.query_params.get('sort', '').strip().lower()
+        sort_option = unquote(request.query_params.get('sort', '').strip().lower())
+        category_filter = request.query_params.get('category')
+        if category_filter:
+            category_filter = unquote(category_filter).replace('&amp;', '&').strip()
+
+        search_query = request.query_params.get('search')
+        if search_query:
+            search_query = unquote(search_query).strip()
         
         # Start with all products
         products_queryset = Product.objects.all()
+        
+        # Apply filtering
+        if category_filter:
+            products_queryset = products_queryset.filter(category=category_filter)
+            
+        if search_query:
+            # Case-insensitive search on name and description
+            products_queryset = products_queryset.filter(
+                Q(name__icontains=search_query) | 
+                Q(description__icontains=search_query)
+            )
+            
         products = []
         
         # Pre-fetch all reviews to avoid N+1 queries
@@ -200,9 +220,16 @@ def product_list_create(request):
         if sort_option == 'price':
             # Sort by price ascending, then by name
             products.sort(key=lambda p: (float(p.get('price', 0)), p.get('name', '').lower()))
+        elif sort_option == 'price-desc':
+            # Sort by price descending, then by name
+            products.sort(key=lambda p: (float(p.get('price', 0)), p.get('name', '').lower()), reverse=True)
         elif sort_option == 'popularity':
-            # Sort by average_rating descending, then by name
-            products.sort(key=lambda p: (float(p.get('average_rating', 0) or 0), p.get('name', '').lower()), reverse=True)
+            # Sort by average_rating descending, then by rating_count descending, then by name
+            products.sort(key=lambda p: (
+                float(p.get('average_rating', 0) or 0),
+                p.get('rating_count', 0),
+                p.get('name', '').lower()
+            ), reverse=True)
         
         return Response({
             'products': products,

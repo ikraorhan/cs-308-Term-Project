@@ -18,17 +18,15 @@ export default function Products({ showFilters = true, limit = null }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [sortBy, setSortBy] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "");
+  const [sortBy, setSortBy] = useState("");
 
-  // Get category from URL params (only if showFilters is true)
+  // Sync category state with URL params
   useEffect(() => {
     if (showFilters) {
       const categoryParam = searchParams.get("category");
-      if (categoryParam) {
-        setSelectedCategory(categoryParam);
-      }
+      setSelectedCategory(categoryParam || "");
     }
   }, [searchParams, showFilters]);
 
@@ -123,6 +121,7 @@ export default function Products({ showFilters = true, limit = null }) {
             >
               <option value="">Sort by...</option>
               <option value="price">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
               <option value="popularity">Popularity</option>
             </select>
 
