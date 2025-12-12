@@ -28,6 +28,7 @@ function ProductDetail() {
   const [submissionError, setSubmissionError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [hasDelivered, setHasDelivered] = useState(false);
+  const [userReviewStatus, setUserReviewStatus] = useState(null);
 
   // Display data
   const [reviews, setReviews] = useState([]);
@@ -78,7 +79,9 @@ function ProductDetail() {
       );
 
       // Calculate Stats
-      const activeReviews = productReviews.filter(r => r.status !== 'rejected');
+      // Calculate Stats
+      // User requested ALL ratings to be counted instantly (Pending, Approved, Rejected)
+      const activeReviews = productReviews;
       const totalCount = activeReviews.length;
       let totalSum = 0;
       activeReviews.forEach(r => {
@@ -140,9 +143,14 @@ function ProductDetail() {
           setShowReviewForm(false);
         }
 
+
+
         if (alreadyReviewed) {
           setRatingValue(userReview.rating);
-          setSubmitted(true);
+          setSubmitted(false); // Do NOT show "submitted" message on load
+          if (userReview) {
+            setUserReviewStatus(userReview.status || 'pending');
+          }
         }
       }
 
@@ -353,8 +361,12 @@ function ProductDetail() {
             </div>
           )}
 
-          {alreadyReviewed && (
-            <div className="already-reviewed-message"><p>You have already reviewed this product. Thank you!</p></div>
+          {alreadyReviewed && !submitted && (
+            <div className="already-reviewed-message">
+              <p>You have already reviewed this product.</p>
+              {userReviewStatus === 'pending' && <p><em>Status: Pending Approval</em></p>}
+              {userReviewStatus === 'approved' && <p><em>Status: Approved</em></p>}
+            </div>
           )}
 
           {/* Strict Message if NOT delivered */}

@@ -10,7 +10,7 @@ const API_BASE_URL = 'http://localhost:8000/api';
  */
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ async function apiRequest(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    
+
     // Try to parse JSON, but handle cases where response might not be JSON
     let data;
     try {
@@ -258,7 +258,7 @@ const PRODUCT_MANAGER_BASE_URL = 'http://localhost:8000';
 
 async function productManagerRequest(endpoint, options = {}) {
   const url = `${PRODUCT_MANAGER_BASE_URL}${endpoint}`;
-  
+
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
@@ -277,7 +277,7 @@ async function productManagerRequest(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    
+
     // Try to parse JSON, but handle cases where response might not be JSON
     let data;
     try {
@@ -419,8 +419,25 @@ export const productManagerAPI = {
    * Get all orders
    * @param {string|null} statusFilter - Optional status filter
    */
-  async getOrders(statusFilter = null) {
-    const endpoint = statusFilter ? `/orders/?status=${statusFilter}` : '/orders/';
+  async getOrders(params = null) {
+    let endpoint = '/orders/';
+
+    if (params) {
+      if (typeof params === 'string') {
+        endpoint += `?status=${params}`;
+      } else if (typeof params === 'object') {
+        const queryParams = new URLSearchParams();
+        Object.keys(params).forEach(key => {
+          if (params[key] !== undefined && params[key] !== null) {
+            queryParams.append(key, params[key]);
+          }
+        });
+        const queryString = queryParams.toString();
+        if (queryString) {
+          endpoint += `?${queryString}`;
+        }
+      }
+    }
     return productManagerRequest(endpoint);
   },
 
