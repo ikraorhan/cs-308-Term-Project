@@ -2,7 +2,7 @@
 Django Admin configuration for Product Manager API
 """
 from django.contrib import admin
-from .models import Product, Order, Review
+from .models import Product, Order, Review, OrderItem
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -39,12 +39,21 @@ class ProductAdmin(admin.ModelAdmin):
         }),
     )
 
+class OrderItemInline(admin.TabularInline):
+    """Inline admin for OrderItem"""
+    model = OrderItem
+    extra = 0
+    readonly_fields = ('created_at',)
+    fields = ('product_id', 'product_name', 'quantity', 'price', 'created_at')
+    can_delete = False
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('delivery_id', 'customer_name', 'product_name', 'quantity', 'total_price', 'status', 'order_date')
+    list_display = ('delivery_id', 'customer_name', 'get_items_summary', 'total_price', 'status', 'order_date')
     list_filter = ('status', 'order_date', 'delivery_date')
     search_fields = ('delivery_id', 'customer_name', 'customer_email', 'product_name', 'delivery_address')
     readonly_fields = ('created_at', 'updated_at')
+    inlines = [OrderItemInline]
     fieldsets = (
         ('Order Information', {
             'fields': ('delivery_id', 'status', 'order_date', 'delivery_date')
@@ -52,14 +61,33 @@ class OrderAdmin(admin.ModelAdmin):
         ('Customer Information', {
             'fields': ('customer_id', 'customer_name', 'customer_email', 'delivery_address')
         }),
-        ('Product Information', {
-            'fields': ('product_id', 'product_name', 'quantity', 'total_price')
+        ('Legacy Product Information (deprecated - use OrderItems below)', {
+            'fields': ('product_id', 'product_name', 'quantity', 'total_price'),
+            'classes': ('collapse',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_items_summary(self, obj):
+        """Display summary of order items"""
+        items = obj.items.all()
+        if items.exists():
+            return ', '.join([f"{item.product_name} (×{item.quantity})" for item in items])
+        elif obj.product_name:
+            return f"{obj.product_name} (×{obj.quantity})" if obj.quantity else obj.product_name
+        return "No items"
+    get_items_summary.short_description = 'Products'
+
+@admin.register(OrderItem)
+class OrderItemAdmin(admin.ModelAdmin):
+    list_display = ('id', 'order', 'product_id', 'product_name', 'quantity', 'price', 'created_at')
+    list_filter = ('created_at', 'order__status')
+    search_fields = ('product_name', 'order__delivery_id', 'order__customer_name', 'order__customer_email')
+    readonly_fields = ('created_at',)
+    list_select_related = ('order',)
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):

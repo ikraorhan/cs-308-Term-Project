@@ -180,15 +180,36 @@ function OrderHistory() {
                 </div>
 
                 <div className="order-card-body">
-                  <div className="order-info-item full-width product-row">
-                    <span className="info-label">Product:</span>
-                    <span className="info-value">{order.product_name}</span>
-                  </div>
-
-                  <div className="order-info-item inline-row">
-                    <span className="info-label">Quantity:</span>
-                    <span className="info-value">×{order.quantity}</span>
-                  </div>
+                  {/* OrderItems varsa (yeni format), her ürünü ayrı göster */}
+                  {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
+                    <div className="order-items-list">
+                      <span className="info-label" style={{ display: 'block', marginBottom: '8px' }}>Products:</span>
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="order-item-row" style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          padding: '8px 0',
+                          borderBottom: idx < order.items.length - 1 ? '1px solid #e0e0e0' : 'none'
+                        }}>
+                          <span className="info-value">{item.product_name}</span>
+                          <span className="info-value">×{item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Eski format için fallback */
+                    <>
+                      <div className="order-info-item full-width product-row">
+                        <span className="info-label">Product:</span>
+                        <span className="info-value">{order.product_name || 'N/A'}</span>
+                      </div>
+                      <div className="order-info-item inline-row">
+                        <span className="info-label">Quantity:</span>
+                        <span className="info-value">×{order.quantity || 1}</span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="order-info-row">
                     <div className="order-info-item inline-row">

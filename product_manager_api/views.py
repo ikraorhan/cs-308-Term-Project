@@ -15,12 +15,13 @@ from .models import Product # Import Product model
 
 # Import Review and Order models
 try:
-    from .models import Review, Order
+    from .models import Review, Order, OrderItem
     USE_DATABASE = True
 except ImportError:
     USE_DATABASE = False
     Review = None
     Order = None
+    OrderItem = None
 
 # Mock data - Will be replaced with database in future sprints
 MOCK_PRODUCTS = [
@@ -418,7 +419,7 @@ def order_list(request):
     email_filter = request.query_params.get('email')
     product_filter = request.query_params.get('product_id')
     
-    if USE_DATABASE and Order:
+    if USE_DATABASE and Order and OrderItem:
         orders_query = Order.objects.all().order_by('-order_date', '-created_at')
         if status_filter:
             orders_query = orders_query.filter(status=status_filter)
@@ -427,21 +428,35 @@ def order_list(request):
         if product_filter:
             orders_query = orders_query.filter(product_id=product_filter)
             
-        orders_data = [{
-            'delivery_id': o.delivery_id,
-            'customer_id': o.customer_id,
-            'customer_name': o.customer_name,
-            'customer_email': o.customer_email,
-            'product_id': o.product_id,
-            'product_name': o.product_name,
-            'quantity': o.quantity,
-            'total_price': float(o.total_price),
-            'delivery_address': o.delivery_address,
-            'status': o.status,
-            'order_date': o.order_date.strftime('%Y-%m-%d'),
-            'delivery_date': o.delivery_date.strftime('%Y-%m-%d') if o.delivery_date else None,
-            'created_at': o.created_at.isoformat() if hasattr(o, 'created_at') else None,
-        } for o in orders_query]
+        orders_data = []
+        for o in orders_query:
+            # Get OrderItems for this order
+            order_items = []
+            if hasattr(o, 'items'):
+                order_items = [{
+                    'product_id': item.product_id,
+                    'product_name': item.product_name,
+                    'quantity': item.quantity,
+                    'price': float(item.price)
+                } for item in o.items.all()]
+            
+            order_data = {
+                'delivery_id': o.delivery_id,
+                'customer_id': o.customer_id,
+                'customer_name': o.customer_name,
+                'customer_email': o.customer_email,
+                'product_id': o.product_id,  # Legacy field
+                'product_name': o.product_name,  # Legacy field
+                'quantity': o.quantity,  # Legacy field
+                'total_price': float(o.total_price),
+                'delivery_address': o.delivery_address,
+                'status': o.status,
+                'order_date': o.order_date.strftime('%Y-%m-%d'),
+                'delivery_date': o.delivery_date.strftime('%Y-%m-%d') if o.delivery_date else None,
+                'created_at': o.created_at.isoformat() if hasattr(o, 'created_at') else None,
+                'items': order_items  # YENİ: OrderItem'lar
+            }
+            orders_data.append(order_data)
         
         return Response({
             'orders': orders_data,
@@ -462,6 +477,45 @@ def order_list(request):
 @permission_classes([AllowAny])
 def order_detail(request, delivery_id):
     """Get specific order details"""
+    if USE_DATABASE and Order and OrderItem:
+        try:
+            order = Order.objects.get(delivery_id=delivery_id)
+            
+            # Get OrderItems for this order
+            order_items = []
+            if hasattr(order, 'items'):
+                order_items = [{
+                    'product_id': item.product_id,
+                    'product_name': item.product_name,
+                    'quantity': item.quantity,
+                    'price': float(item.price)
+                } for item in order.items.all()]
+            
+            order_data = {
+                'delivery_id': order.delivery_id,
+                'customer_id': order.customer_id,
+                'customer_name': order.customer_name,
+                'customer_email': order.customer_email,
+                'product_id': order.product_id,  # Legacy field
+                'product_name': order.product_name,  # Legacy field
+                'quantity': order.quantity,  # Legacy field
+                'total_price': float(order.total_price),
+                'delivery_address': order.delivery_address,
+                'status': order.status,
+                'order_date': order.order_date.strftime('%Y-%m-%d'),
+                'delivery_date': order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else None,
+                'created_at': order.created_at.isoformat() if hasattr(order, 'created_at') else None,
+                'items': order_items  # YENİ: OrderItem'lar
+            }
+            
+            return Response(order_data, status=status.HTTP_200_OK)
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    # Fallback to mock data
     order = next((o for o in MOCK_ORDERS if o['delivery_id'] == delivery_id), None)
     
     if not order:
@@ -470,7 +524,17 @@ def order_detail(request, delivery_id):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    return Response(order, status=status.HTTP_200_OK)
+    # Mock data için items array'i oluştur (legacy field'lardan)
+    mock_order = order.copy()
+    if 'items' not in mock_order and mock_order.get('product_name'):
+        mock_order['items'] = [{
+            'product_id': mock_order.get('product_id', 0),
+            'product_name': mock_order.get('product_name', ''),
+            'quantity': mock_order.get('quantity', 1),
+            'price': float(mock_order.get('total_price', 0)) / max(mock_order.get('quantity', 1), 1)
+        }]
+    
+    return Response(mock_order, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -491,25 +555,39 @@ def order_history(request):
         USE_ORDER_DB = False
         Order = None
     
-    if USE_ORDER_DB and Order:
+    if USE_ORDER_DB and Order and OrderItem:
         # Use database
         orders_query = Order.objects.filter(customer_email=email).order_by('-order_date', '-created_at')
         
-        orders_data = [{
-            'delivery_id': o.delivery_id,
-            'customer_id': o.customer_id,
-            'customer_name': o.customer_name,
-            'customer_email': o.customer_email,
-            'product_id': o.product_id,
-            'product_name': o.product_name,
-            'quantity': o.quantity,
-            'total_price': float(o.total_price),
-            'delivery_address': o.delivery_address,
-            'status': o.status,
-            'order_date': o.order_date.strftime('%Y-%m-%d'),
-            'delivery_date': o.delivery_date.strftime('%Y-%m-%d') if o.delivery_date else None,
-            'created_at': o.created_at.isoformat() if hasattr(o, 'created_at') else None,
-        } for o in orders_query]
+        orders_data = []
+        for o in orders_query:
+            # Get OrderItems for this order
+            order_items = []
+            if hasattr(o, 'items'):
+                order_items = [{
+                    'product_id': item.product_id,
+                    'product_name': item.product_name,
+                    'quantity': item.quantity,
+                    'price': float(item.price)
+                } for item in o.items.all()]
+            
+            order_data = {
+                'delivery_id': o.delivery_id,
+                'customer_id': o.customer_id,
+                'customer_name': o.customer_name,
+                'customer_email': o.customer_email,
+                'product_id': o.product_id,  # Legacy field
+                'product_name': o.product_name,  # Legacy field
+                'quantity': o.quantity,  # Legacy field
+                'total_price': float(o.total_price),
+                'delivery_address': o.delivery_address,
+                'status': o.status,
+                'order_date': o.order_date.strftime('%Y-%m-%d'),
+                'delivery_date': o.delivery_date.strftime('%Y-%m-%d') if o.delivery_date else None,
+                'created_at': o.created_at.isoformat() if hasattr(o, 'created_at') else None,
+                'items': order_items  # YENİ: OrderItem'lar
+            }
+            orders_data.append(order_data)
     else:
         # Use mock data
         orders_data = [
@@ -551,7 +629,7 @@ def order_update_status(request, delivery_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    if USE_DATABASE and Order:
+    if USE_DATABASE and Order and OrderItem:
         try:
             order = Order.objects.get(delivery_id=delivery_id)
             order.status = new_status
@@ -562,19 +640,30 @@ def order_update_status(request, delivery_id):
             
             order.save()
             
+            # Get OrderItems for this order
+            order_items = []
+            if hasattr(order, 'items'):
+                order_items = [{
+                    'product_id': item.product_id,
+                    'product_name': item.product_name,
+                    'quantity': item.quantity,
+                    'price': float(item.price)
+                } for item in order.items.all()]
+            
             return Response({
                 "delivery_id": order.delivery_id,
                 "customer_id": order.customer_id,
                 "customer_name": order.customer_name,
                 "customer_email": order.customer_email,
-                "product_id": order.product_id,
-                "product_name": order.product_name,
-                "quantity": order.quantity,
+                "product_id": order.product_id,  # Legacy field
+                "product_name": order.product_name,  # Legacy field
+                "quantity": order.quantity,  # Legacy field
                 "total_price": float(order.total_price),
                 "delivery_address": order.delivery_address,
                 "status": order.status,
                 "order_date": order.order_date.strftime('%Y-%m-%d') if order.order_date else None,
                 "delivery_date": order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else None,
+                "items": order_items  # OrderItem'lar
             }, status=status.HTTP_200_OK)
             
         except Order.DoesNotExist:
@@ -939,68 +1028,176 @@ def create_order(request):
         order_date = date.today()
 
         # Try to save to database first
-        if USE_DATABASE and Order:
-            # 1. Update Product Stock FIRST
-            product_id = data.get("product_id")
-            quantity_ordered = int(data.get("quantity", 1))
+        if USE_DATABASE and Order and OrderItem:
+            # Check if items array is provided (new format with multiple products)
+            items = data.get("items", [])
             
-            # If product_id is provided, use it. If not, try to find by name (fallback)
-            product_obj = None
-            if product_id:
-                try:
-                    product_obj = Product.objects.get(id=product_id)
-                except Product.DoesNotExist:
-                    print(f"Product with id {product_id} not found.")
-            
-            # Decrease stock if product found
-            if product_obj:
-                if product_obj.quantity_in_stock >= quantity_ordered:
+            if items and len(items) > 0:
+                # NEW FORMAT: Multiple products in one order
+                # 1. First, validate all products and check stock
+                products_to_update = []
+                for item in items:
+                    product_id = item.get("product_id")
+                    quantity_ordered = int(item.get("quantity", 1))
+                    
+                    if not product_id:
+                        return Response(
+                            {"error": f"Missing product_id in item: {item.get('product_name', 'Unknown')}"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    try:
+                        product_obj = Product.objects.get(id=product_id)
+                    except Product.DoesNotExist:
+                        return Response(
+                            {"error": f"Product with id {product_id} not found."},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Check stock availability
+                    if product_obj.quantity_in_stock < quantity_ordered:
+                        return Response(
+                            {"error": f"Insufficient stock for {product_obj.name}. Available: {product_obj.quantity_in_stock}, Requested: {quantity_ordered}"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    products_to_update.append((product_obj, quantity_ordered, item))
+                
+                # 2. If all validations pass, update stock for all products
+                for product_obj, quantity_ordered, item in products_to_update:
                     product_obj.quantity_in_stock -= quantity_ordered
                     product_obj.save()
-                else:
-                    return Response(
-                        {"error": f"Insufficient stock for {product_obj.name}. Available: {product_obj.quantity_in_stock}"},
-                        status=status.HTTP_400_BAD_REQUEST
+                
+                # 3. Create single Order
+                order = Order.objects.create(
+                    delivery_id=delivery_id,
+                    customer_id=customer_id,
+                    customer_name=data["customer_name"],
+                    customer_email=data["customer_email"],
+                    product_id=None,  # No single product for multi-item orders
+                    product_name="",  # No single product name
+                    quantity=None,  # No single quantity
+                    total_price=data["total_price"],
+                    delivery_address=data["delivery_address"],
+                    status="processing",
+                    order_date=order_date,
+                    delivery_date=None
+                )
+                
+                # 4. Create OrderItems for each product
+                order_items = []
+                for product_obj, quantity_ordered, item in products_to_update:
+                    order_item = OrderItem.objects.create(
+                        order=order,
+                        product_id=product_obj.id,
+                        product_name=item.get("product_name", product_obj.name),
+                        quantity=quantity_ordered,
+                        price=float(item.get("price", product_obj.price))
                     )
+                    order_items.append({
+                        "product_id": order_item.product_id,
+                        "product_name": order_item.product_name,
+                        "quantity": order_item.quantity,
+                        "price": float(order_item.price)
+                    })
+                
+                # Convert to dict for response
+                new_order = {
+                    "delivery_id": order.delivery_id,
+                    "customer_id": order.customer_id,
+                    "customer_name": order.customer_name,
+                    "customer_email": order.customer_email,
+                    "total_price": float(order.total_price),
+                    "delivery_address": order.delivery_address,
+                    "status": order.status,
+                    "order_date": order.order_date.strftime("%Y-%m-%d") if order.order_date else None,
+                    "delivery_date": order.delivery_date.strftime("%Y-%m-%d") if order.delivery_date else None,
+                    "items": order_items
+                }
+                
+                return Response(
+                    {"message": "Order created successfully", "order": new_order},
+                    status=status.HTTP_201_CREATED
+                )
+            
+            else:
+                # OLD FORMAT: Single product (backward compatibility)
+                product_id = data.get("product_id")
+                quantity_ordered = int(data.get("quantity", 1))
+                
+                # If product_id is provided, use it. If not, try to find by name (fallback)
+                product_obj = None
+                if product_id:
+                    try:
+                        product_obj = Product.objects.get(id=product_id)
+                    except Product.DoesNotExist:
+                        print(f"Product with id {product_id} not found.")
+                
+                # Decrease stock if product found
+                if product_obj:
+                    if product_obj.quantity_in_stock >= quantity_ordered:
+                        product_obj.quantity_in_stock -= quantity_ordered
+                        product_obj.save()
+                    else:
+                        return Response(
+                            {"error": f"Insufficient stock for {product_obj.name}. Available: {product_obj.quantity_in_stock}"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-            # 2. Create Order
-            order = Order.objects.create(
-                delivery_id=delivery_id,
-                customer_id=customer_id,
-                customer_name=data["customer_name"],
-                customer_email=data["customer_email"],
-                product_id=data.get("product_id", 0),
-                product_name=data["product_name"],
-                quantity=data["quantity"],
-                total_price=data["total_price"],
-                delivery_address=data["delivery_address"],
-                status="processing",
-                order_date=order_date,
-                delivery_date=None
-            )
-            
-            # Convert to dict for response
-            new_order = {
-                "delivery_id": order.delivery_id,
-                "customer_id": order.customer_id,
-                "customer_name": order.customer_name,
-                "customer_email": order.customer_email,
-                "product_id": order.product_id,
-                "product_name": order.product_name,
-                "quantity": order.quantity,
-                "total_price": float(order.total_price),
-                "delivery_address": order.delivery_address,
-                "status": order.status,
-                "order_date": order.order_date.strftime("%Y-%m-%d") if order.order_date else None,
-                "delivery_date": order.delivery_date.strftime("%Y-%m-%d") if order.delivery_date else None,
-            }
-            
-            # Email sending removed due to model incompatibility
-            
-            return Response(
-                {"message": "Order created successfully", "order": new_order},
-                status=status.HTTP_201_CREATED
-            )
+                # Create Order
+                order = Order.objects.create(
+                    delivery_id=delivery_id,
+                    customer_id=customer_id,
+                    customer_name=data["customer_name"],
+                    customer_email=data["customer_email"],
+                    product_id=data.get("product_id", 0),
+                    product_name=data["product_name"],
+                    quantity=data["quantity"],
+                    total_price=data["total_price"],
+                    delivery_address=data["delivery_address"],
+                    status="processing",
+                    order_date=order_date,
+                    delivery_date=None
+                )
+                
+                # Create OrderItem for single product (to maintain consistency)
+                order_items = []
+                if product_obj:
+                    order_item = OrderItem.objects.create(
+                        order=order,
+                        product_id=product_obj.id,
+                        product_name=data["product_name"],
+                        quantity=quantity_ordered,
+                        price=float(product_obj.price)
+                    )
+                    order_items.append({
+                        "product_id": order_item.product_id,
+                        "product_name": order_item.product_name,
+                        "quantity": order_item.quantity,
+                        "price": float(order_item.price)
+                    })
+                
+                # Convert to dict for response
+                new_order = {
+                    "delivery_id": order.delivery_id,
+                    "customer_id": order.customer_id,
+                    "customer_name": order.customer_name,
+                    "customer_email": order.customer_email,
+                    "product_id": order.product_id,  # Legacy field
+                    "product_name": order.product_name,  # Legacy field
+                    "quantity": order.quantity,  # Legacy field
+                    "total_price": float(order.total_price),
+                    "delivery_address": order.delivery_address,
+                    "status": order.status,
+                    "order_date": order.order_date.strftime("%Y-%m-%d") if order.order_date else None,
+                    "delivery_date": order.delivery_date.strftime("%Y-%m-%d") if order.delivery_date else None,
+                    "items": order_items  # OrderItem'lar
+                }
+                
+                return Response(
+                    {"message": "Order created successfully", "order": new_order},
+                    status=status.HTTP_201_CREATED
+                )
         
         # Fallback to mock data (only if DB not available)
         new_order = {
@@ -1056,24 +1253,38 @@ def user_order_history(request):
         )
     
     # Try to get orders from database first
-    if USE_DATABASE and Order:
+    if USE_DATABASE and Order and OrderItem:
         try:
             orders = Order.objects.filter(customer_email=user_email).order_by('-order_date', '-created_at')
-            orders_data = [{
-                'delivery_id': order.delivery_id,
-                'customer_id': order.customer_id,
-                'customer_name': order.customer_name,
-                'customer_email': order.customer_email,
-                'product_id': order.product_id,
-                'product_name': order.product_name,
-                'quantity': order.quantity,
-                'total_price': float(order.total_price),
-                'delivery_address': order.delivery_address,
-                'status': order.status,
-                'order_date': order.order_date.strftime('%Y-%m-%d') if order.order_date else None,
-                'delivery_date': order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else None,
-                'created_at': order.created_at.isoformat() if order.created_at else None,
-            } for order in orders]
+            orders_data = []
+            for order in orders:
+                # Get OrderItems for this order
+                order_items = []
+                if hasattr(order, 'items'):
+                    order_items = [{
+                        'product_id': item.product_id,
+                        'product_name': item.product_name,
+                        'quantity': item.quantity,
+                        'price': float(item.price)
+                    } for item in order.items.all()]
+                
+                order_data = {
+                    'delivery_id': order.delivery_id,
+                    'customer_id': order.customer_id,
+                    'customer_name': order.customer_name,
+                    'customer_email': order.customer_email,
+                    'product_id': order.product_id,  # Legacy field
+                    'product_name': order.product_name,  # Legacy field
+                    'quantity': order.quantity,  # Legacy field
+                    'total_price': float(order.total_price),
+                    'delivery_address': order.delivery_address,
+                    'status': order.status,
+                    'order_date': order.order_date.strftime('%Y-%m-%d') if order.order_date else None,
+                    'delivery_date': order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else None,
+                    'created_at': order.created_at.isoformat() if order.created_at else None,
+                    'items': order_items  # YENİ: OrderItem'lar
+                }
+                orders_data.append(order_data)
             
             return Response({
                 'orders': orders_data,

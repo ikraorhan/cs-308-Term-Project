@@ -122,23 +122,30 @@ export default function PaymentMockFlow({
         return;
       }
       
-      // Tüm ürünleri tek bir sipariş olarak birleştir
+      // Her ürün için item oluştur (OrderItem için)
+      const items = cartItems.map(item => ({
+        product_id: item.id || item.product_id || 0,
+        product_name: item.name || item.product_name || 'Product',
+        quantity: item.quantity || 1,
+        price: item.price || 0
+      }));
+      
+      // Geriye uyumluluk için birleşik bilgiler (eski format için)
       const totalQuantity = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
       const productNames = cartItems.map(item => 
         `${item.name || item.product_name || 'Product'} (x${item.quantity || 1})`
       ).join(', ');
-      
-      // İlk ürünün ID'sini kullan (veya 0)
       const firstProductId = cartItems.length > 0 ? (cartItems[0].id || cartItems[0].product_id || 0) : 0;
       
       const orderData = {
         customer_name: userName,
         customer_email: userEmail,
-        product_name: productNames, // Tüm ürünlerin birleşik adı
-        product_id: firstProductId,
-        quantity: totalQuantity, // Toplam miktar
+        product_name: productNames, // Geriye uyumluluk için
+        product_id: firstProductId, // Geriye uyumluluk için
+        quantity: totalQuantity, // Geriye uyumluluk için
         total_price: amount, // Toplam fiyat
-        delivery_address: deliveryAddress
+        delivery_address: deliveryAddress,
+        items: items // YENİ: Her ürün için OrderItem oluşturulacak
       };
       
       const orderResponse = await fetch('http://localhost:8000/orders/create/', {

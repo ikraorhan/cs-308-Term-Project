@@ -208,19 +208,33 @@ function Profile() {
   };
 
   const transformOrders = (orders) => {
-    return orders.map(order => ({
-      id: order.delivery_id || order.id,
-      date: order.order_date || order.date,
-      status: order.status === 'processing' ? 'Processing' : 
-              order.status === 'in-transit' ? 'In transit' : 
-              order.status === 'delivered' ? 'Delivered' : order.status,
-      total: parseFloat(order.total_price) || 0,
-      currency: 'TRY',
-      items: [{
-        name: order.product_name || 'Product',
-        quantity: order.quantity || 1,
-      }],
-    }));
+    return orders.map(order => {
+      // Eğer order.items varsa (yeni format), onu kullan
+      let items = [];
+      if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+        items = order.items.map(item => ({
+          name: item.product_name || 'Product',
+          quantity: item.quantity || 1,
+        }));
+      } else if (order.product_name) {
+        // Eski format için fallback
+        items = [{
+          name: order.product_name || 'Product',
+          quantity: order.quantity || 1,
+        }];
+      }
+      
+      return {
+        id: order.delivery_id || order.id,
+        date: order.order_date || order.date,
+        status: order.status === 'processing' ? 'Processing' : 
+                order.status === 'in-transit' ? 'In transit' : 
+                order.status === 'delivered' ? 'Delivered' : order.status,
+        total: parseFloat(order.total_price) || 0,
+        currency: 'TRY',
+        items: items,
+      };
+    });
   };
 
   const saveProfileToBackend = async (updatedFields) => {
