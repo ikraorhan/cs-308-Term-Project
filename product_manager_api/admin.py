@@ -2,7 +2,12 @@
 Django Admin configuration for Product Manager API
 """
 from django.contrib import admin
-from .models import Product, Order, Review, OrderItem
+from .models import Product, Order, Review, OrderItem, Category
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):

@@ -1,33 +1,41 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { productsAPI } from "../product_manager_api";
+import { productManagerAPI } from "./api"; // Import main API
 import "./Categories.css";
-
-const CATEGORIES = [
-  "Food",
-  "Collars & Leashes",
-  "Food & Water Bowls",
-  "Toys",
-  "Grooming & Hygiene",
-  "Treats & Snacks",
-];
 
 export default function Categories() {
   const [categoryData, setCategoryData] = useState({});
+  const [categoriesList, setCategoriesList] = useState([]); // Store list of categories
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function loadCategories() {
+    async function loadData() {
       try {
         setLoading(true);
-        const response = await productsAPI.getProducts({});
-        const products = response?.data ?? [];
+        // 1. Fetch Categories
+        const catResponse = await productManagerAPI.getCategories();
+        const categories = catResponse?.data?.categories || [];
+        setCategoriesList(categories);
 
-        // Group products by category
+        // 2. Fetch Products
+        const prodResponse = await productsAPI.getProducts({});
+        const products = prodResponse?.data ?? [];
+
+        // 3. Group products by category
         const grouped = {};
-        CATEGORIES.forEach((cat) => {
-          grouped[cat] = products.filter((p) => p.category === cat);
+        // Initialize all categories with empty array
+        categories.forEach(cat => grouped[cat] = []);
+
+        // Fill properly
+        products.forEach((p) => {
+          if (grouped[p.category]) {
+            grouped[p.category].push(p);
+          } else if (categories.includes(p.category)) {
+            // Should verify against known categories, or add dynamic ones if products have them
+            grouped[p.category].push(p);
+          }
         });
 
         setCategoryData(grouped);
@@ -37,7 +45,7 @@ export default function Categories() {
         setLoading(false);
       }
     }
-    loadCategories();
+    loadData();
   }, []);
 
   const handleCategoryClick = (category) => {
@@ -56,7 +64,7 @@ export default function Categories() {
       </p>
 
       <div className="categories-grid">
-        {CATEGORIES.map((category) => {
+        {categoriesList.map((category) => {
           const products = categoryData[category] || [];
           const totalProducts = products.length;
           const totalStock = products.reduce(
