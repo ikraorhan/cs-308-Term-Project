@@ -251,6 +251,49 @@ export const cartAPI = {
 };
 
 /**
+ * Wishlist API
+ */
+export const wishlistAPI = {
+  /**
+   * Get user's wishlist items
+   */
+  async getWishlist() {
+    return apiRequest('/wishlist/');
+  },
+
+  /**
+   * Add item to wishlist
+   * @param {Object} itemData - { product_id, product_name, price, image_url, description }
+   */
+  async addToWishlist(itemData) {
+    return apiRequest('/wishlist/add/', {
+      method: 'POST',
+      body: JSON.stringify(itemData),
+    });
+  },
+
+  /**
+   * Remove item from wishlist
+   * @param {number} itemId - Wishlist item ID
+   */
+  async removeFromWishlist(itemId) {
+    return apiRequest(`/wishlist/item/${itemId}/remove/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Remove item from wishlist by product_id
+   * @param {number} productId - Product ID
+   */
+  async removeFromWishlistByProduct(productId) {
+    return apiRequest(`/wishlist/product/${productId}/remove/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+/**
  * Product Manager API
  * Base URL: http://localhost:8000/ (root level, not under /api/)
  */

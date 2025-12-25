@@ -59,6 +59,10 @@ export default function Menubar() {
       setIsAuthenticated(false);
       setIsAdmin(false);
       setUserEmail("");
+      
+      // Dispatch custom event for chat widget to close
+      window.dispatchEvent(new Event('storage'));
+      
       // Navigate to login
       navigate("/login");
     } catch (error) {
@@ -68,6 +72,10 @@ export default function Menubar() {
       setIsAuthenticated(false);
       setIsAdmin(false);
       setUserEmail("");
+      
+      // Dispatch custom event for chat widget to close
+      window.dispatchEvent(new Event('storage'));
+      
       navigate("/login");
     }
   };
@@ -83,11 +91,13 @@ export default function Menubar() {
         <Link to="/categories">Categories</Link>
         <Link to="/about">About Us</Link>
         <Link to="/cart">Cart</Link>
+        {isAuthenticated && <Link to="/wishlist">Wishlist</Link>}
         <Link to="/profile">Profile</Link>
         {isAdmin && (
           <>
             <Link to="/product-manager/comments">Comment Approval</Link>
             <Link to="/delivery/dashboard">Delivery Dashboard</Link>
+            <Link to="/support/dashboard">Support Dashboard</Link>
           </>
         )}
       </div>
