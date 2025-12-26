@@ -229,6 +229,9 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'almiraaygun@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'jkys ehwm bebl uypn')  # MOVE TO ENV VAR!
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'almiraaygun@gmail.com')
 
+# Frontend URL for email links
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+
 # SECURITY SETTINGS (To enable these in production)
 if not DEBUG:
     # Force HTTPS

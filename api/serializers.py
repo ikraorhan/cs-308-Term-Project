@@ -174,6 +174,7 @@ class UserSerializer(serializers.ModelSerializer):
                 'loyalty_points': profile.loyalty_points or 0,
                 'pets_supported': profile.pets_supported or 0,
                 'role': profile.role or 'customer',
+                'receive_sales_emails': profile.receive_sales_emails or False,
             }
         except:
             # If profile doesn't exist, return empty profile
@@ -184,6 +185,7 @@ class UserSerializer(serializers.ModelSerializer):
                 'loyalty_points': 0,
                 'pets_supported': 0,
                 'role': 'customer',
+                'receive_sales_emails': False,
             }
 
 

@@ -62,6 +62,11 @@ const DEFAULT_PROFILE = {
       description: 'Shipping progress and delivery confirmations via SMS.',
       enabled: true,
     },
+    salesEmails: {
+      label: 'Sales & promotional emails',
+      description: 'Receive emails about special offers, discounts, and new product launches.',
+      enabled: false,
+    },
   },
   recentOrders: [],
   careNotes: [
@@ -103,7 +108,16 @@ function sanitizeProfile(stored) {
   if (!stored) return DEFAULT_PROFILE;
   try {
     const parsed = JSON.parse(stored);
-    return { ...DEFAULT_PROFILE, ...parsed };
+    // Ensure preferences object is properly merged
+    const merged = { 
+      ...DEFAULT_PROFILE, 
+      ...parsed,
+      preferences: {
+        ...DEFAULT_PROFILE.preferences,
+        ...(parsed.preferences || {}),
+      }
+    };
+    return merged;
   } catch (error) {
     console.warn('Corrupted profile data. Resetting to defaults.', error);
     return DEFAULT_PROFILE;
@@ -118,10 +132,15 @@ function Profile() {
   const [profile, setProfile] = useState(() => {
     const stored = localStorage.getItem(PROFILE_STORAGE_KEY);
     const merged = sanitizeProfile(stored);
+    // Ensure preferences object includes all defaults, especially salesEmails
     return {
       ...merged,
       name: activeMockUser.name ?? merged.name,
       email: activeMockUser.email ?? merged.email,
+      preferences: {
+        ...DEFAULT_PROFILE.preferences,
+        ...merged.preferences,
+      },
     };
   });
 
@@ -149,18 +168,31 @@ function Profile() {
         const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username;
 
         // Merge backend data with local defaults
-        setProfile(prev => ({
-          ...prev,
-          id: String(userData.id),
-          name: fullName,
-          email: userData.email || prev.email,
-          phone: profileData.phone || prev.phone,
-          bio: profileData.bio || prev.bio,
-          loyaltyTier: profileData.loyalty_tier || prev.loyaltyTier || 'Standard',
-          points: profileData.loyalty_points || prev.points || 0,
-          petsSupported: profileData.pets_supported || prev.petsSupported || 0,
-          memberSince: userData.date_joined ? new Date(userData.date_joined).toISOString().split('T')[0] : prev.memberSince,
-        }));
+        setProfile(prev => {
+          // Ensure all default preferences are present
+          const defaultPreferences = DEFAULT_PROFILE.preferences;
+          return {
+            ...prev,
+            id: String(userData.id),
+            name: fullName,
+            email: userData.email || prev.email,
+            phone: profileData.phone || prev.phone,
+            bio: profileData.bio || prev.bio,
+            loyaltyTier: profileData.loyalty_tier || prev.loyaltyTier || 'Standard',
+            points: profileData.loyalty_points || prev.points || 0,
+            petsSupported: profileData.pets_supported || prev.petsSupported || 0,
+            memberSince: userData.date_joined ? new Date(userData.date_joined).toISOString().split('T')[0] : prev.memberSince,
+            preferences: {
+              ...defaultPreferences,
+              ...prev.preferences,
+              salesEmails: {
+                label: 'Sales & promotional emails',
+                description: 'Receive emails about special offers, discounts, and new product launches.',
+                enabled: profileData.receive_sales_emails || false,
+              },
+            },
+          };
+        });
       }
     } catch (err) {
       console.error('Failed to load profile from backend:', err);
@@ -264,18 +296,41 @@ function Profile() {
     saveMockUsers(updatedMockUsers);
   }, [profile.name, profile.email, profile.id, mockUsers]);
 
-  const handleTogglePreference = (key) => {
+  const handleTogglePreference = async (key) => {
+    const newValue = !profile.preferences[key].enabled;
+    
+    // Update local state immediately for better UX
     setProfile((prev) => ({
       ...prev,
       preferences: {
         ...prev.preferences,
         [key]: {
           ...prev.preferences[key],
-          enabled: !prev.preferences[key].enabled,
+          enabled: newValue,
         },
       },
     }));
-    // Note: Preferences are stored locally only for now
+
+    // If it's salesEmails, save to backend
+    if (key === 'salesEmails') {
+      try {
+        await saveProfileToBackend({ receive_sales_emails: newValue });
+      } catch (err) {
+        // Revert on error
+        setProfile((prev) => ({
+          ...prev,
+          preferences: {
+            ...prev.preferences,
+            [key]: {
+              ...prev.preferences[key],
+              enabled: !newValue,
+            },
+          },
+        }));
+        setError('Failed to update email preference. Please try again.');
+      }
+    }
+    // Note: Other preferences are stored locally only for now
   };
 
   const handleSetDefaultAddress = (id) => {
@@ -506,21 +561,29 @@ function Profile() {
             <p>Fine-tune the reminders and content we prepare just for you.</p>
           </header>
           <ul className="preference-list">
-            {Object.entries(profile.preferences).map(([key, preference]) => (
-              <li key={key} className="preference-item">
-                <div>
-                  <p className="preference-label">{preference.label}</p>
-                  <p className="preference-description">{preference.description}</p>
-                </div>
-                <button
-                  type="button"
-                  className={`switch ${preference.enabled ? 'is-on' : ''}`}
-                  onClick={() => handleTogglePreference(key)}
-                >
-                  <span className="switch-handle" />
-                </button>
-              </li>
-            ))}
+            {Object.entries(profile.preferences || {}).map(([key, preference]) => {
+              // Skip if preference doesn't have required fields
+              if (!preference || !preference.label) {
+                console.warn(`Skipping preference ${key}: missing label`, preference);
+                return null;
+              }
+              
+              return (
+                <li key={key} className="preference-item">
+                  <div>
+                    <p className="preference-label">{preference.label}</p>
+                    <p className="preference-description">{preference.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`switch ${preference.enabled ? 'is-on' : ''}`}
+                    onClick={() => handleTogglePreference(key)}
+                  >
+                    <span className="switch-handle" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </article>
 

@@ -110,6 +110,7 @@ def register(request):
                     'loyalty_tier': 'Standard',
                     'loyalty_points': 0,
                     'pets_supported': 0,
+                    'receive_sales_emails': False,
                 }
             )
             return Response({
@@ -231,6 +232,8 @@ def update_user_profile(request):
             profile.loyalty_points = request.data.get('loyalty_points', 0)
         if 'pets_supported' in request.data:
             profile.pets_supported = request.data.get('pets_supported', 0)
+        if 'receive_sales_emails' in request.data:
+            profile.receive_sales_emails = request.data.get('receive_sales_emails', False)
         
         profile.save()
         

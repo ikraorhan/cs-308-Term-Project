@@ -19,6 +19,7 @@ class UserProfile(models.Model):
     loyalty_tier = models.CharField(max_length=50, blank=True, default='')
     loyalty_points = models.IntegerField(default=0)
     pets_supported = models.IntegerField(default=0)
+    receive_sales_emails = models.BooleanField(default=False, help_text='Whether the user wants to receive sales/promotional emails')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

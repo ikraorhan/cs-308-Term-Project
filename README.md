@@ -71,5 +71,51 @@ http://localhost:5173
 2. **Test User:**
    - Email: `user@example.com`
    - Password: `password123`
-# cs-308-Term-Project
+
+---
+
+## 📧 Sales Email Automation
+
+### Özellikler
+
+- ✅ Kullanıcılar Profile sayfasından sales email'lere abone olabilir
+- ✅ Management command ile toplu email gönderimi
+- ✅ Profesyonel HTML email template'leri
+- ✅ Kişiselleştirilmiş email içeriği
+- ✅ Hata yönetimi ve raporlama
+
+### Hızlı Başlangıç
+
+1. **Migration çalıştır:**
+```bash
+python manage.py migrate
+```
+
+2. **Kullanıcı abone olur:**
+   - Profile sayfasına git (`/profile`)
+   - "Sales & promotional emails" toggle'ını aç
+
+3. **Email gönder:**
+```bash
+python manage.py send_sales_emails \
+  --subject "Özel İndirim!" \
+  --message "Tüm ürünlerde %50 indirim!"
+```
+
+### Demo ve Test
+
+Detaylı demo rehberi için: **[DEMO_SALES_EMAIL.md](./DEMO_SALES_EMAIL.md)**
+
+Hızlı test scripti:
+```bash
+./test_sales_email.sh
+```
+
+### Dokümantasyon
+
+- **Demo Rehberi**: [DEMO_SALES_EMAIL.md](./DEMO_SALES_EMAIL.md)
+- **Teknik Detaylar**: [SALES_EMAIL_AUTOMATION.md](./SALES_EMAIL_AUTOMATION.md)
+
+---
+
 # cs-308-Term-Project
