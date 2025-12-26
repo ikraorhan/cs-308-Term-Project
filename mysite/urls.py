@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/send-order-email/', send_order_email_api, name='send_order_email'),
     
     # Product manager API routes
+    path('api/sales/', include('sales_manager_api.urls')),
     path('', include('product_manager_api.urls')),
     
     # Legacy login/logout (for Django templates)

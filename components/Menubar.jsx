@@ -14,22 +14,22 @@ export default function Menubar() {
   useEffect(() => {
     const checkAuth = () => {
       const authStatus = localStorage.getItem("is_authenticated") === "true";
-      const adminStatus = localStorage.getItem("is_admin") === "true" || 
-                          localStorage.getItem("is_staff") === "true" || 
-                          localStorage.getItem("is_superuser") === "true";
+      const adminStatus = localStorage.getItem("is_admin") === "true" ||
+        localStorage.getItem("is_staff") === "true" ||
+        localStorage.getItem("is_superuser") === "true";
       const email = localStorage.getItem("user_email") || "";
-      
+
       // Check if user is Product Manager or Admin
-      const userRole = localStorage.getItem("user_role") || 
-                      JSON.parse(localStorage.getItem("user_data") || "{}")?.profile?.role ||
-                      JSON.parse(localStorage.getItem("user_data") || "{}")?.role;
+      const userRole = localStorage.getItem("user_role") ||
+        JSON.parse(localStorage.getItem("user_data") || "{}")?.profile?.role ||
+        JSON.parse(localStorage.getItem("user_data") || "{}")?.role;
       const isProductManager = userRole === "product_manager" || userRole === "admin" || adminStatus;
 
       setIsAuthenticated(authStatus);
       setIsAdmin(isProductManager); // Show admin links if PM or Admin
       setUserEmail(email);
     };
-    
+
     // Check immediately
     checkAuth();
   }, [location]);
@@ -38,15 +38,15 @@ export default function Menubar() {
   useEffect(() => {
     const handleStorageChange = () => {
       const authStatus = localStorage.getItem("is_authenticated") === "true";
-      const adminStatus = localStorage.getItem("is_admin") === "true" || 
-                          localStorage.getItem("is_staff") === "true" || 
-                          localStorage.getItem("is_superuser") === "true";
+      const adminStatus = localStorage.getItem("is_admin") === "true" ||
+        localStorage.getItem("is_staff") === "true" ||
+        localStorage.getItem("is_superuser") === "true";
       const email = localStorage.getItem("user_email") || "";
-      
+
       // Check if user is Product Manager or Admin
-      const userRole = localStorage.getItem("user_role") || 
-                      JSON.parse(localStorage.getItem("user_data") || "{}")?.profile?.role ||
-                      JSON.parse(localStorage.getItem("user_data") || "{}")?.role;
+      const userRole = localStorage.getItem("user_role") ||
+        JSON.parse(localStorage.getItem("user_data") || "{}")?.profile?.role ||
+        JSON.parse(localStorage.getItem("user_data") || "{}")?.role;
       const isProductManager = userRole === "product_manager" || userRole === "admin" || adminStatus;
 
       setIsAuthenticated(authStatus);
@@ -100,6 +100,7 @@ export default function Menubar() {
           <>
             <Link to="/product-manager/comments">Comment Approval</Link>
             <Link to="/delivery/dashboard">Delivery Dashboard</Link>
+            <Link to="/sales-manager">Sales Dashboard</Link>
           </>
         )}
       </div>

@@ -21,7 +21,8 @@ import DeliveryDashboard from "./components/DeliveryDepartment/DeliveryDashboard
 import OrderManagement from "./components/ProductManager/OrderManagement.jsx";
 
 // --- YENİ EKLENEN IMPORT ---
-import ProductDetail from './components/ProductDetail'; 
+import ProductDetail from './components/ProductDetail';
+import SalesManager from './components/SalesManager/SalesManager';
 
 function App() {
   return (
@@ -38,7 +39,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/order-history" element={<OrderHistory />} />
             <Route path="/products" element={<Products />} />
-            
+
             {/* --- YENİ EKLENEN ROUTE --- */}
             {/* :id kısmı, ürünün ID'sinin (örneğin 2) buraya geleceğini belirtir */}
             <Route path="/product/:id" element={<ProductDetail />} />
@@ -51,6 +52,7 @@ function App() {
             <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
             <Route path="/delivery/orders" element={<OrderManagement />} />
             <Route path="/product-manager/comments" element={<CommentApproval />} />
+            <Route path="/sales-manager" element={<SalesManager />} />
           </Routes>
         </div>
       </Router>

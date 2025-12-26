@@ -501,3 +501,41 @@ export const productManagerAPI = {
   },
 };
 
+/**
+ * Sales Manager API
+ */
+export const salesManagerAPI = {
+  async getDashboardStats() {
+    return apiRequest('/sales/dashboard-stats/');
+  },
+  async getCampaigns() {
+    return apiRequest('/sales/campaigns/');
+  },
+  async createCampaign(data) {
+    return apiRequest('/sales/campaigns/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async getCampaign(id) {
+    return apiRequest(`/sales/campaigns/${id}/`);
+  },
+  async updateCampaign(id, data) {
+    return apiRequest(`/sales/campaigns/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteCampaign(id) {
+    return apiRequest(`/sales/campaigns/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+  async updateProductPrice(id, price) {
+    return apiRequest(`/sales/products/${id}/price/`, {
+      method: 'PUT',
+      body: JSON.stringify({ price }),
+    });
+  }
+};
+

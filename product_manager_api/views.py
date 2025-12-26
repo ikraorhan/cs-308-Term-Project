@@ -1194,3 +1194,147 @@ def user_order_history(request):
         'orders': user_orders,
         'count': len(user_orders)
     }, status=status.HTTP_200_OK)
+
+# ==================== SALES MANAGER VIEWS ====================
+
+@api_view(['GET'])
+@permission_classes([IsSalesManager])
+def sales_dashboard_stats(request):
+    """Get sales analytics (Revenue, Profit)"""
+    try:
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        # Base query
+        orders = Order.objects.filter(status__in=['processing', 'in-transit', 'delivered'])
+        
+        if start_date:
+            orders = orders.filter(order_date__gte=start_date)
+        if end_date:
+            orders = orders.filter(order_date__lte=end_date)
+            
+        # Calculate Revenue and Profit
+        # Revenue = Sum of total_price (or sum of items price*quantity)
+        # Profit = Revenue - Cost
+        
+        # We need to iterate items to calculate profit because cost is on Product
+        revenue = 0
+        total_cost = 0
+        
+        # If we had a huge DB, we would use aggregation, but for this scale iteration is fine 
+        # and allows handling missing costs safely
+        for order in orders:
+            revenue += float(order.total_price)
+            for item in order.items.all():
+                try:
+                    product = Product.objects.get(id=item.product_id)
+                    cost = float(product.cost) if product.cost else (float(item.price) * 0.5)
+                    total_cost += cost * item.quantity
+                except Product.DoesNotExist:
+                    # Fallback if product deleted, assume 50% margin
+                    total_cost += (float(item.price) * 0.5) * item.quantity
+                    
+        profit = revenue - total_cost
+        
+        return Response({
+            'revenue': revenue,
+            'profit': profit,
+            'loss': 0 if profit >= 0 else abs(profit),
+            'order_count': orders.count()
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsSalesManager])
+def apply_discount(request):
+    """Apply discount to a product (update price) and notify wishlist users"""
+    try:
+        product_id = request.data.get('product_id')
+        new_price = float(request.data.get('new_price'))
+        
+        product = get_object_or_404(Product, id=product_id)
+        old_price = float(product.price)
+        
+        if new_price < 0:
+            return Response({'error': 'Price cannot be negative'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        product.price = new_price
+        product.save()
+        
+        # Check for price drop and notify
+        if new_price < old_price:
+            notify_wishlist_users(product, old_price, new_price)
+            
+        return Response({
+            'message': 'Price updated successfully',
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'price': product.price,
+                'old_price': old_price
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def notify_wishlist_users(product, old_price, new_price):
+    """Send email notification to users who have this product in wishlist"""
+    try:
+        from api.models import Wishlist
+        from django.core.mail import send_mail
+        from django.conf import settings
+        
+        wishlist_items = Wishlist.objects.filter(product_id=product.id)
+        recipient_emails = [item.user.email for item in wishlist_items if item.user.email]
+        
+        if not recipient_emails:
+            return
+
+        subject = f"Price Drop Alert: {product.name} is now cheaper!"
+        message = f"""
+        Good news!
+        
+        The product "{product.name}" in your wishlist is now on sale.
+        
+        Old Price: {old_price} TL
+        New Price: {new_price} TL
+        
+        Don't miss out!
+        """
+        
+        # Send mass mail or loop? send_mail can take a list
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@petstore.com'),
+            recipient_list=recipient_emails,
+            fail_silently=True
+        )
+        print(f"Notification sent to {len(recipient_emails)} users for product {product.id}")
+        
+    except Exception as e:
+        print(f"Failed to send wishlist notifications: {e}")
+
+
+@api_view(['GET'])
+@permission_classes([IsSalesManager])
+def download_invoice(request, delivery_id):
+    """Download invoice PDF"""
+    try:
+        from api.utils import generate_invoice_pdf
+        from django.http import HttpResponse
+        
+        order = get_object_or_404(Order, delivery_id=delivery_id)
+        buffer = generate_invoice_pdf(order)
+        
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="invoice_{order.delivery_id}.pdf"'
+        return response
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

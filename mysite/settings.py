@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'core',  # your app
     'api',
     'product_manager_api',
+    'sales_manager_api',
     'rest_framework',
     'corsheaders',  # CORS support for React frontend
 ]
