@@ -1,0 +1,14 @@
+# Django and Django REST Framework
+Django>=5.2.8
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+
+# PDF generation for invoices
+reportlab>=4.0.0
+
+# Encryption for sensitive data
+cryptography>=42.0.0
+
+# Database (if using PostgreSQL in production)
+# psycopg2-binary>=2.9.0
+

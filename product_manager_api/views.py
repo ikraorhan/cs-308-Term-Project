@@ -3,9 +3,17 @@ Product Manager API Views
 Handles product management, stock management, order management, and comment approval
 """
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny  # TODO: Add proper authentication
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+
+# Import custom role-based permissions
+from api.permissions import (
+    IsProductManager,
+    IsSalesManager,
+    IsProductManagerOrReadOnly,
+    IsOwnerOrAdmin
+)
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 import json
@@ -153,7 +161,7 @@ MOCK_CATEGORIES = ["Food", "Accessories", "Housing", "Toys", "Health"]
 
 # Product Management
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsProductManagerOrReadOnly])  # GET: public, POST: ProductManager only
 def product_list_create(request):
     """Get all products or create a new product"""
     if request.method == 'GET':
@@ -275,7 +283,7 @@ def product_list_create(request):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([AllowAny])
+@permission_classes([IsProductManagerOrReadOnly])  # GET: public, PUT/DELETE: ProductManager only
 def product_detail(request, product_id):
     """Get, update, or delete a specific product"""
     product = get_object_or_404(Product, id=product_id)
@@ -369,7 +377,7 @@ def category_delete(request, category_name):
 
 # Stock Management
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsProductManager])  # Only Product Managers can view stock
 def stock_list(request):
     """Get stock status for all products"""
     products = Product.objects.all()
@@ -386,7 +394,7 @@ def stock_list(request):
     return Response({'stock': stock_data}, status=status.HTTP_200_OK)
 
 @api_view(['PUT'])
-@permission_classes([AllowAny])
+@permission_classes([IsProductManager])  # Only Product Managers can update stock
 def stock_update(request, product_id):
     """Update stock quantity for a product"""
     product = get_object_or_404(Product, id=product_id)
@@ -414,7 +422,7 @@ def stock_update(request, product_id):
 
 # Order/Delivery Management
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsSalesManager])  # Only Sales Managers can view all orders
 def order_list(request):
     """Get all orders/deliveries"""
     status_filter = request.query_params.get('status')
@@ -466,7 +474,7 @@ def order_list(request):
     }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])  # Authenticated users (ownership checked in logic)
 def order_detail(request, delivery_id):
     """Get specific order details"""
     if USE_DATABASE and Order:
@@ -505,7 +513,7 @@ def order_detail(request, delivery_id):
     return Response(order, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])  # User must be authenticated
 def order_history(request):
     """Get order history for a specific user by email"""
     email = request.query_params.get('email')
@@ -574,7 +582,7 @@ def order_history(request):
 from django.views.decorators.csrf import csrf_exempt
 
 @api_view(['PUT'])
-@permission_classes([AllowAny])
+@permission_classes([IsSalesManager])  # Only Sales Managers can update order status
 @csrf_exempt
 def order_update_status(request, delivery_id):
     """Update order status (processing, in-transit, delivered)"""
@@ -636,7 +644,7 @@ def order_update_status(request, delivery_id):
     return Response(order, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])  # User must be authenticated to write reviews
 def review_create(request):
     """Create a new review/comment"""
     if not USE_DATABASE or not Review:
@@ -695,15 +703,34 @@ def review_create(request):
         )
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([AllowAny])  # Public can view approved, but we'll filter by role in the view
 def comment_list(request):
-    """Get all comments (pending and approved)"""
+    """Get all comments (pending and approved) - Product Managers see all, others only approved"""
     status_filter = request.query_params.get('status')
+    
+    # Check if user is Product Manager
+    is_product_manager = False
+    if request.user and request.user.is_authenticated:
+        try:
+            profile = request.user.profile
+            is_product_manager = profile.is_product_manager()
+        except:
+            pass
     
     if USE_DATABASE and Review:
         reviews_query = Review.objects.all()
+        
+        # If not Product Manager, only show approved comments
+        if not is_product_manager:
+            reviews_query = reviews_query.filter(status='approved')
+        
         if status_filter:
-            reviews_query = reviews_query.filter(status=status_filter)
+            # Only allow status filter for Product Managers
+            if is_product_manager:
+                reviews_query = reviews_query.filter(status=status_filter)
+            else:
+                # Non-PMs can only see approved, ignore other filters
+                reviews_query = reviews_query.filter(status='approved')
         
         comments = [{
             'id': r.id,
@@ -722,13 +749,22 @@ def comment_list(request):
             'created_at': r.created_at.isoformat(),
         } for r in reviews_query]
         
-        pending_count = Review.objects.filter(status='pending').count()
+        # Only show pending count to Product Managers
+        pending_count = Review.objects.filter(status='pending').count() if is_product_manager else 0
     else:
         # Fallback to mock data
         comments = MOCK_COMMENTS.copy()
+        # Filter by role - non-PMs only see approved
+        if not is_product_manager:
+            comments = [c for c in comments if c['status'] == 'approved']
         if status_filter:
-            comments = [c for c in comments if c['status'] == status_filter]
-        pending_count = len([c for c in MOCK_COMMENTS if c['status'] == 'pending'])
+            # Only allow status filter for Product Managers
+            if is_product_manager:
+                comments = [c for c in comments if c['status'] == status_filter]
+            else:
+                # Non-PMs can only see approved
+                comments = [c for c in comments if c['status'] == 'approved']
+        pending_count = len([c for c in MOCK_COMMENTS if c['status'] == 'pending']) if is_product_manager else 0
     
     return Response({
         'comments': comments,
@@ -737,7 +773,7 @@ def comment_list(request):
     }, status=status.HTTP_200_OK)
 
 @api_view(['PUT'])
-@permission_classes([AllowAny])
+@permission_classes([IsProductManager])  # Only Product Managers can approve/reject comments
 def comment_approve(request, comment_id):
     """Approve or reject a comment"""
     if USE_DATABASE and Review:
@@ -824,7 +860,7 @@ def comment_approve(request, comment_id):
 
 # Dashboard Stats
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsProductManager])  # Only managers can view dashboard stats
 def dashboard_stats(request):
     """Get dashboard statistics"""
     return Response({
@@ -840,7 +876,7 @@ def dashboard_stats(request):
     }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsSalesManager])  # Only Sales Managers can view delivery stats
 def delivery_dashboard_stats(request):
     """Return delivery department dashboard statistics"""
     from django.db.models import Sum
@@ -952,7 +988,7 @@ from datetime import datetime, date
 import uuid
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])  # User must be authenticated to create order
 def create_order(request):
     """Create a new order from checkout"""
     import logging
@@ -1109,7 +1145,7 @@ def create_order(request):
 # Order History (User Orders)
 # =============================
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])  # User must be authenticated to view their orders
 def user_order_history(request):
     """Get order history for the current user by email"""
     user_email = request.query_params.get('email')

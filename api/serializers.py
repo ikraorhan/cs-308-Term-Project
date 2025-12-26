@@ -143,17 +143,25 @@ class UserSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     is_staff = serializers.BooleanField(read_only=True)
     is_superuser = serializers.BooleanField(read_only=True)
+    role = serializers.SerializerMethodField()
     profile = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'date_joined', 
-                  'is_staff', 'is_superuser', 'is_admin', 'profile')
+                  'is_staff', 'is_superuser', 'is_admin', 'role', 'profile')
         read_only_fields = ('id', 'username', 'date_joined', 'is_staff', 'is_superuser')
     
     def get_is_admin(self, obj):
         """Check if user is admin (staff or superuser)"""
         return obj.is_staff or obj.is_superuser
+    
+    def get_role(self, obj):
+        """Get user's security role for access control"""
+        try:
+            return obj.profile.role
+        except:
+            return 'customer'  # Default role
     
     def get_profile(self, obj):
         """Get user profile data"""
@@ -165,6 +173,7 @@ class UserSerializer(serializers.ModelSerializer):
                 'loyalty_tier': profile.loyalty_tier or '',
                 'loyalty_points': profile.loyalty_points or 0,
                 'pets_supported': profile.pets_supported or 0,
+                'role': profile.role or 'customer',
             }
         except:
             # If profile doesn't exist, return empty profile
@@ -174,6 +183,7 @@ class UserSerializer(serializers.ModelSerializer):
                 'loyalty_tier': '',
                 'loyalty_points': 0,
                 'pets_supported': 0,
+                'role': 'customer',
             }
 
 

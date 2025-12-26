@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -58,12 +59,17 @@ LOGOUT_REDIRECT_URL = 'login'  # where to go after logout
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-l#-t&1a24r5!*g$bqua$y*5g522@%01to@tpsh@(mc_=8=s@qr'
+# In production, set DJANGO_SECRET_KEY environment variable
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-l#-t&1a24r5!*g$bqua$y*5g522@%01to@tpsh@(mc_=8=s@qr')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else []
+
+# Encryption key for sensitive data (passwords already hashed by Django)
+# In production, set ENCRYPTION_KEY environment variable
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', None)
 
 
 # Application definition
@@ -213,10 +219,32 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'almiraaygun@gmail.com'
-EMAIL_HOST_PASSWORD = 'jkys ehwm bebl uypn'
-DEFAULT_FROM_EMAIL = 'almiraaygun@gmail.com'
+# SECURITY: Use environment variables for email credentials in production
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'almiraaygun@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'jkys ehwm bebl uypn')  # MOVE TO ENV VAR!
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'almiraaygun@gmail.com')
+
+# SECURITY SETTINGS (To enable these in production)
+if not DEBUG:
+    # Force HTTPS
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # HTTP Strict Transport Security
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Prevent clickjacking
+    X_FRAME_OPTIONS = 'DENY'
+    
+    # Content type sniffing protection
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    
+    # XSS protection
+    SECURE_BROWSER_XSS_FILTER = True

@@ -168,6 +168,11 @@ export function storeUserData(user) {
     localStorage.setItem('is_admin', (user.is_admin || user.is_staff || user.is_superuser) ? 'true' : 'false');
     localStorage.setItem('is_staff', user.is_staff ? 'true' : 'false');
     localStorage.setItem('is_superuser', user.is_superuser ? 'true' : 'false');
+    // Store user role from profile
+    const userRole = user.profile?.role || user.role || 'customer';
+    localStorage.setItem('user_role', userRole);
+    // Also store full user data for easier access
+    localStorage.setItem('user_data', JSON.stringify(user));
   }
 }
 
@@ -183,6 +188,8 @@ export function clearUserData() {
   localStorage.removeItem('is_admin');
   localStorage.removeItem('is_staff');
   localStorage.removeItem('is_superuser');
+  localStorage.removeItem('user_role');
+  localStorage.removeItem('user_data');
 }
 
 /**

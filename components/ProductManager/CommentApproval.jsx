@@ -1,18 +1,49 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { productManagerAPI } from '../api';
 import './CommentApproval.css';
 
 function CommentApproval() {
+  const navigate = useNavigate();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('pending');
   const [message, setMessage] = useState('');
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
+  const [unauthorized, setUnauthorized] = useState(false);
+
+  // Check if user has Product Manager role
+  useEffect(() => {
+    const checkAccess = () => {
+      const userRole = localStorage.getItem('user_role') || 
+                      JSON.parse(localStorage.getItem('user_data') || '{}')?.profile?.role ||
+                      JSON.parse(localStorage.getItem('user_data') || '{}')?.role;
+      const isAdmin = localStorage.getItem('is_admin') === 'true' || 
+                      localStorage.getItem('is_staff') === 'true' || 
+                      localStorage.getItem('is_superuser') === 'true';
+      
+      // Allow access if user is Product Manager, Admin, or Staff
+      const allowedRoles = ['product_manager', 'admin'];
+      const hasAccess = allowedRoles.includes(userRole) || isAdmin;
+      
+      if (!hasAccess) {
+        setUnauthorized(true);
+        // Redirect after 3 seconds
+        setTimeout(() => {
+          navigate('/products');
+        }, 3000);
+      }
+    };
+    
+    checkAccess();
+  }, [navigate]);
 
   useEffect(() => {
-    loadComments();
-  }, [statusFilter]);
+    if (!unauthorized) {
+      loadComments();
+    }
+  }, [statusFilter, unauthorized]);
 
   const loadComments = async () => {
     try {
@@ -82,6 +113,22 @@ function CommentApproval() {
     }
     return <div className="star-rating">{stars}</div>;
   };
+
+  // Show unauthorized message if user doesn't have access
+  if (unauthorized) {
+    return (
+      <div className="comment-approval-container">
+        <div className="ca-error" style={{textAlign: 'center', padding: '40px'}}>
+          <h2>⛔ Access Denied</h2>
+          <p>You do not have permission to access this page.</p>
+          <p>Only Product Managers and Administrators can approve comments.</p>
+          <p style={{fontSize: '14px', color: '#999', marginTop: '20px'}}>
+            Redirecting to products page...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

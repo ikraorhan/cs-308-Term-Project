@@ -3,7 +3,17 @@ from django.contrib.auth.models import User
 
 class UserProfile(models.Model):
     """Extended profile information for users"""
+    
+    # Role choices for access control
+    ROLE_CHOICES = [
+        ('customer', 'Customer'),
+        ('product_manager', 'Product Manager'),
+        ('sales_manager', 'Sales Manager'),
+        ('admin', 'Administrator'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     phone = models.CharField(max_length=20, blank=True, default='')
     bio = models.TextField(blank=True, default='')
     loyalty_tier = models.CharField(max_length=50, blank=True, default='')
@@ -14,6 +24,15 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Profile for {self.user.username}"
+    
+    def is_admin(self):
+        return self.role == 'admin' or self.user.is_superuser
+    
+    def is_product_manager(self):
+        return self.role in ['product_manager', 'admin'] or self.user.is_superuser
+    
+    def is_sales_manager(self):
+        return self.role in ['sales_manager', 'admin'] or self.user.is_superuser
 
 
 class Order(models.Model):

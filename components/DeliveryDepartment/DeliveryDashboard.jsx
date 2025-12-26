@@ -1,18 +1,49 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { productManagerAPI } from '../api';
 import './DeliveryDashboard.css';
 
 function DeliveryDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [unauthorized, setUnauthorized] = useState(false);
+
+  // Check if user has Sales Manager role
+  useEffect(() => {
+    const checkAccess = () => {
+      const userRole = localStorage.getItem('user_role') || 
+                      JSON.parse(localStorage.getItem('user_data') || '{}')?.profile?.role ||
+                      JSON.parse(localStorage.getItem('user_data') || '{}')?.role;
+      const isAdmin = localStorage.getItem('is_admin') === 'true' || 
+                      localStorage.getItem('is_staff') === 'true' || 
+                      localStorage.getItem('is_superuser') === 'true';
+      
+      // Allow access if user is Sales Manager, Admin, or Staff
+      const allowedRoles = ['sales_manager', 'admin'];
+      const hasAccess = allowedRoles.includes(userRole) || isAdmin;
+      
+      if (!hasAccess) {
+        setUnauthorized(true);
+        // Redirect after 3 seconds
+        setTimeout(() => {
+          navigate('/products');
+        }, 3000);
+      }
+    };
+    
+    checkAccess();
+  }, [navigate]);
 
   useEffect(() => {
-    fetchStats();
-    // Refresh stats every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!unauthorized) {
+      fetchStats();
+      // Refresh stats every 30 seconds
+      const interval = setInterval(fetchStats, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [unauthorized]);
 
   const fetchStats = async () => {
     try {
@@ -26,6 +57,22 @@ function DeliveryDashboard() {
       setLoading(false);
     }
   };
+
+  // Show unauthorized message if user doesn't have access
+  if (unauthorized) {
+    return (
+      <div className="delivery-dashboard-container">
+        <div className="delivery-dashboard-error" style={{textAlign: 'center', padding: '40px'}}>
+          <h2>⛔ Access Denied</h2>
+          <p>You do not have permission to access this page.</p>
+          <p>Only Sales Managers and Administrators can view delivery dashboard.</p>
+          <p style={{fontSize: '14px', color: '#999', marginTop: '20px'}}>
+            Redirecting to products page...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="delivery-dashboard-loading">Loading delivery dashboard...</div>;

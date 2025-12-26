@@ -18,9 +18,15 @@ export default function Menubar() {
                           localStorage.getItem("is_staff") === "true" || 
                           localStorage.getItem("is_superuser") === "true";
       const email = localStorage.getItem("user_email") || "";
+      
+      // Check if user is Product Manager or Admin
+      const userRole = localStorage.getItem("user_role") || 
+                      JSON.parse(localStorage.getItem("user_data") || "{}")?.profile?.role ||
+                      JSON.parse(localStorage.getItem("user_data") || "{}")?.role;
+      const isProductManager = userRole === "product_manager" || userRole === "admin" || adminStatus;
 
       setIsAuthenticated(authStatus);
-      setIsAdmin(adminStatus);
+      setIsAdmin(isProductManager); // Show admin links if PM or Admin
       setUserEmail(email);
     };
     
@@ -36,9 +42,15 @@ export default function Menubar() {
                           localStorage.getItem("is_staff") === "true" || 
                           localStorage.getItem("is_superuser") === "true";
       const email = localStorage.getItem("user_email") || "";
+      
+      // Check if user is Product Manager or Admin
+      const userRole = localStorage.getItem("user_role") || 
+                      JSON.parse(localStorage.getItem("user_data") || "{}")?.profile?.role ||
+                      JSON.parse(localStorage.getItem("user_data") || "{}")?.role;
+      const isProductManager = userRole === "product_manager" || userRole === "admin" || adminStatus;
 
       setIsAuthenticated(authStatus);
-      setIsAdmin(adminStatus);
+      setIsAdmin(isProductManager); // Show admin links if PM or Admin
       setUserEmail(email);
     };
 
