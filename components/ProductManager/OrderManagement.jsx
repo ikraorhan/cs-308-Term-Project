@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { productManagerAPI } from '../api';
+import InvoiceModal from './InvoiceModal';
 import './OrderManagement.css';
 
 function OrderManagement() {
@@ -9,6 +10,7 @@ function OrderManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
   useEffect(() => {
     // URL'den status parametresini al
@@ -176,6 +178,14 @@ function OrderManagement() {
               {order.status === 'delivered' && (
                 <span className="delivery-complete">✓ Delivery Complete</span>
               )}
+
+              <button
+                className="btn-view-invoice"
+                style={{ marginLeft: '10px', padding: '5px 10px', cursor: 'pointer', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
+                onClick={() => setSelectedInvoiceOrder(order)}
+              >
+                View Invoice
+              </button>
             </div>
           </div>
         ))}
@@ -183,6 +193,13 @@ function OrderManagement() {
 
       {orders.length === 0 && (
         <div className="no-orders">No orders found.</div>
+      )}
+
+      {selectedInvoiceOrder && (
+        <InvoiceModal
+          order={selectedInvoiceOrder}
+          onClose={() => setSelectedInvoiceOrder(null)}
+        />
       )}
     </div>
   );

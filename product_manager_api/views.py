@@ -17,13 +17,14 @@ from .models import Product # Import Product model
 
 # Import Review and Order models
 try:
-    from .models import Review, Order, OrderItem
+    from .models import Review, Order, OrderItem, Category, Delivery
     USE_DATABASE = True
 except ImportError:
     USE_DATABASE = False
     Review = None
     Order = None
     OrderItem = None
+    Category = None
 
 # Mock data - Will be replaced with database in future sprints
 MOCK_PRODUCTS = [
@@ -202,6 +203,11 @@ def product_list_create(request):
             avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
             rating_count = len(ratings)
 
+            # Handle category ForeignKey
+            category_name = ''
+            if p.category:
+                category_name = p.category.name
+
             products.append({
                 "id": p.id,
                 "name": p.name,
@@ -212,7 +218,7 @@ def product_list_create(request):
                 "price": float(p.price),
                 "warranty_status": p.warranty_status,
                 "distributor": p.distributor,
-                "category": p.category,
+                "category": category_name,
                 "cost": float(p.cost) if p.cost else None,
                 "image_url": p.image_url if p.image_url else "https://via.placeholder.com/300x300?text=Product",
                 "average_rating": float(avg_rating),
@@ -242,6 +248,17 @@ def product_list_create(request):
     elif request.method == 'POST':
         # Create new product
         try:
+            # Handle category lookup
+            category_name = request.data.get('category', '')
+            category_obj = None
+            if category_name and USE_DATABASE and Category:
+                category_obj = Category.objects.filter(name=category_name).first()
+                if not category_obj:
+                     # Optional: Create if not exists, or return error. User said "categories exist"
+                     # sticking to safe side: if not found, leave None or create?
+                     # Let's create it to be safe and consistent with previous behavior
+                     category_obj = Category.objects.create(name=category_name)
+
             p = Product.objects.create(
                 name=request.data.get('name'),
                 model=request.data.get('model', ''),
@@ -251,7 +268,7 @@ def product_list_create(request):
                 price=float(request.data.get('price', 0)),
                 warranty_status=request.data.get('warranty_status', ''),
                 distributor=request.data.get('distributor', ''),
-                category=request.data.get('category', ''),
+                category=category_obj,
                 cost=float(request.data.get('cost')) if request.data.get('cost') else None,
                 image_url=request.data.get('image_url', '')
             )
@@ -281,6 +298,10 @@ def product_detail(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     
     if request.method == 'GET':
+        category_name = ''
+        if product.category:
+            category_name = product.category.name
+
         product_data = {
             "id": product.id,
             "name": product.name,
@@ -291,7 +312,7 @@ def product_detail(request, product_id):
             "price": float(product.price),
             "warranty_status": product.warranty_status,
             "distributor": product.distributor,
-            "category": product.category,
+            "category": category_name,
             "cost": float(product.cost) if product.cost else None,
             "image_url": product.image_url if product.image_url else "https://via.placeholder.com/300x300?text=Product"
         }
@@ -305,6 +326,13 @@ def product_detail(request, product_id):
             if 'price' in request.data: product.price = float(request.data['price'])
             if 'quantity_in_stock' in request.data: product.quantity_in_stock = int(request.data['quantity_in_stock'])
             if 'image_url' in request.data: product.image_url = request.data['image_url']
+            
+            if 'category' in request.data and USE_DATABASE and Category:
+                category_name = request.data['category']
+                category_obj = Category.objects.filter(name=category_name).first()
+                if not category_obj:
+                    category_obj = Category.objects.create(name=category_name)
+                product.category = category_obj
             # Add other fields as needed
             
             product.save()
@@ -334,38 +362,77 @@ def product_detail(request, product_id):
 def category_list_create(request):
     """Get all categories or create a new category"""
     if request.method == 'GET':
+        if USE_DATABASE and Category:
+            categories = list(Category.objects.values_list('name', flat=True))
+        else:
+            categories = MOCK_CATEGORIES
+            
         return Response({
-            'categories': MOCK_CATEGORIES,
-            'count': len(MOCK_CATEGORIES)
+            'categories': categories,
+            'count': len(categories)
         }, status=status.HTTP_200_OK)
     
     elif request.method == 'POST':
-        category = request.data.get('name')
-        if category and category not in MOCK_CATEGORIES:
-            MOCK_CATEGORIES.append(category)
+        category_name = request.data.get('name')
+        if not category_name:
+             return Response(
+                {'error': 'Category name is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        if USE_DATABASE and Category:
+            if Category.objects.filter(name=category_name).exists():
+                return Response(
+                    {'error': 'Category already exists'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            Category.objects.create(name=category_name)
             return Response(
-                {'message': 'Category created', 'category': category},
+                {'message': 'Category created', 'category': category_name},
                 status=status.HTTP_201_CREATED
             )
-        return Response(
-            {'error': 'Category already exists or invalid name'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        else:
+            # Fallback to mock
+            if category_name in MOCK_CATEGORIES:
+                 return Response(
+                    {'error': 'Category already exists'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            MOCK_CATEGORIES.append(category_name)
+            return Response(
+                {'message': 'Category created', 'category': category_name},
+                status=status.HTTP_201_CREATED
+            )
 
 @api_view(['DELETE'])
 @permission_classes([AllowAny])
 def category_delete(request, category_name):
     """Delete a category"""
-    if category_name in MOCK_CATEGORIES:
-        MOCK_CATEGORIES.remove(category_name)
+    if USE_DATABASE and Category:
+        try:
+            cat = Category.objects.get(name=category_name)
+            cat.delete()
+            return Response(
+                {'message': 'Category deleted successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Category.DoesNotExist:
+            return Response(
+                {'error': 'Category not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    else:
+        # Fallback
+        if category_name in MOCK_CATEGORIES:
+            MOCK_CATEGORIES.remove(category_name)
+            return Response(
+                {'message': 'Category deleted successfully'},
+                status=status.HTTP_200_OK
+            )
         return Response(
-            {'message': 'Category deleted successfully'},
-            status=status.HTTP_200_OK
+            {'error': 'Category not found'},
+            status=status.HTTP_404_NOT_FOUND
         )
-    return Response(
-        {'error': 'Category not found'},
-        status=status.HTTP_404_NOT_FOUND
-    )
 
 # Stock Management
 @api_view(['GET'])
@@ -595,6 +662,12 @@ def order_update_status(request, delivery_id):
             if new_status == 'delivered' and not order.delivery_date:
                 from django.utils import timezone
                 order.delivery_date = timezone.now().date()
+            
+            # Sync Delivery table status
+            # If order is delivered, mark all delivery items as completed
+            # If status changed away from delivered, mark as incomplete
+            is_completed = (new_status == 'delivered')
+            Delivery.objects.filter(order=order).update(is_completed=is_completed)
             
             order.save()
             
@@ -1036,6 +1109,29 @@ def create_order(request):
                         price=price
                     )
                     
+                    # Create Delivery Record linked to foreign keys
+                    # Check if user is authenticated for customer FK
+                    customer_user = None
+                    if request.user.is_authenticated:
+                        customer_user = request.user
+                    else:
+                        # Fallback: Try to find user by email
+                         try:
+                             from django.contrib.auth.models import User
+                             customer_user = User.objects.filter(email=data.get("customer_email")).first()
+                         except:
+                             customer_user = None
+                    
+                    Delivery.objects.create(
+                        order=order,
+                        customer=customer_user,
+                        product=product_obj, 
+                        quantity=quantity_ordered,
+                        total_price=price * quantity_ordered,
+                        delivery_address=data["delivery_address"],
+                        is_completed=False
+                    )
+
                     order_items_data.append({
                         "product_id": product_id,
                         "product_name": product_name,
