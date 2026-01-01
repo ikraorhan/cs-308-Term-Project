@@ -21,7 +21,10 @@ import DeliveryDashboard from "./components/DeliveryDepartment/DeliveryDashboard
 import OrderManagement from "./components/ProductManager/OrderManagement.jsx";
 
 // --- YENİ EKLENEN IMPORT ---
-import ProductDetail from './components/ProductDetail'; 
+import ProductDetail from './components/ProductDetail';
+import SupportChat from './components/SupportChat/SupportChat';
+import SupportAgentDashboard from './components/SupportAgent/SupportAgentDashboard';
+import Wishlist from './components/Wishlist'; 
 
 function App() {
   return (
@@ -37,6 +40,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/order-history" element={<OrderHistory />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/products" element={<Products />} />
             
             {/* --- YENİ EKLENEN ROUTE --- */}
@@ -51,7 +55,10 @@ function App() {
             <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
             <Route path="/delivery/orders" element={<OrderManagement />} />
             <Route path="/product-manager/comments" element={<CommentApproval />} />
+            <Route path="/support/dashboard" element={<SupportAgentDashboard />} />
           </Routes>
+          {/* Support Chat Widget - Available on all pages */}
+          <SupportChat />
         </div>
       </Router>
     </CartProvider>
