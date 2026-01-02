@@ -10,7 +10,6 @@ from rest_framework import status
 # Import custom role-based permissions
 from api.permissions import (
     IsProductManager,
-    IsSalesManager,
     IsProductManagerOrReadOnly,
     IsOwnerOrAdmin
 )
@@ -422,7 +421,7 @@ def stock_update(request, product_id):
 
 # Order/Delivery Management
 @api_view(['GET'])
-@permission_classes([IsSalesManager])  # Only Sales Managers can view all orders
+@permission_classes([IsProductManager])  # Only Product Managers can view all orders
 def order_list(request):
     """Get all orders/deliveries"""
     status_filter = request.query_params.get('status')
@@ -582,7 +581,7 @@ def order_history(request):
 from django.views.decorators.csrf import csrf_exempt
 
 @api_view(['PUT'])
-@permission_classes([IsSalesManager])  # Only Sales Managers can update order status
+@permission_classes([IsProductManager])  # Only Product Managers can update order status
 @csrf_exempt
 def order_update_status(request, delivery_id):
     """Update order status (processing, in-transit, delivered)"""
@@ -876,7 +875,7 @@ def dashboard_stats(request):
     }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsSalesManager])  # Only Sales Managers can view delivery stats
+@permission_classes([IsProductManager])  # Only Product Managers can view delivery stats
 def delivery_dashboard_stats(request):
     """Return delivery department dashboard statistics"""
     from django.db.models import Sum

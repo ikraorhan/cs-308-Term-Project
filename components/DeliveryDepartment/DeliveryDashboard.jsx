@@ -10,18 +10,18 @@ function DeliveryDashboard() {
   const [error, setError] = useState('');
   const [unauthorized, setUnauthorized] = useState(false);
 
-  // Check if user has Sales Manager role
+  // Check if user has Product Manager role
   useEffect(() => {
     const checkAccess = () => {
-      const userRole = localStorage.getItem('user_role') || 
+      const userRole = localStorage.getItem('user_role') ||
                       JSON.parse(localStorage.getItem('user_data') || '{}')?.profile?.role ||
                       JSON.parse(localStorage.getItem('user_data') || '{}')?.role;
-      const isAdmin = localStorage.getItem('is_admin') === 'true' || 
-                      localStorage.getItem('is_staff') === 'true' || 
+      const isAdmin = localStorage.getItem('is_admin') === 'true' ||
+                      localStorage.getItem('is_staff') === 'true' ||
                       localStorage.getItem('is_superuser') === 'true';
-      
-      // Allow access if user is Sales Manager, Admin, or Staff
-      const allowedRoles = ['sales_manager', 'admin'];
+
+      // Allow access if user is Product Manager, Admin, or Staff
+      const allowedRoles = ['product_manager', 'admin'];
       const hasAccess = allowedRoles.includes(userRole) || isAdmin;
       
       if (!hasAccess) {
@@ -65,7 +65,7 @@ function DeliveryDashboard() {
         <div className="delivery-dashboard-error" style={{textAlign: 'center', padding: '40px'}}>
           <h2>⛔ Access Denied</h2>
           <p>You do not have permission to access this page.</p>
-          <p>Only Sales Managers and Administrators can view delivery dashboard.</p>
+          <p>Only Product Managers and Administrators can view delivery dashboard.</p>
           <p style={{fontSize: '14px', color: '#999', marginTop: '20px'}}>
             Redirecting to products page...
           </p>
