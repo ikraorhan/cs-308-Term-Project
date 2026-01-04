@@ -54,7 +54,12 @@ class Conversation(models.Model):
     closed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        customer_name = self.customer.username if self.customer else f"Guest ({self.guest_session_id[:8]})"
+        if self.customer:
+            customer_name = self.customer.username
+        elif self.guest_session_id:
+            customer_name = f"Guest ({self.guest_session_id[:8]})"
+        else:
+            customer_name = "Guest (Unknown)"
         return f"Conversation #{self.id} - {customer_name} ({self.status})"
 
     class Meta:
@@ -81,7 +86,10 @@ class Message(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
-        sender_name = self.sender.username if self.sender else "Guest"
+        if self.sender:
+            sender_name = self.sender.username
+        else:
+            sender_name = "Guest"
         return f"Message from {sender_name} in Conversation #{self.conversation.id}"
 
     class Meta:
