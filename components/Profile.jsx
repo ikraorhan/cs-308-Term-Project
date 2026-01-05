@@ -141,6 +141,15 @@ function Profile() {
     try {
       setLoading(true);
       setError('');
+      
+      // Check if user is authenticated
+      const isAuth = localStorage.getItem('is_authenticated') === 'true';
+      if (!isAuth) {
+        console.log('User not authenticated, using local data');
+        setLoading(false);
+        return;
+      }
+      
       const response = await authAPI.getCurrentUser();
       const userData = response.data;
 
@@ -161,10 +170,11 @@ function Profile() {
           petsSupported: profileData.pets_supported || prev.petsSupported || 0,
           memberSince: userData.date_joined ? new Date(userData.date_joined).toISOString().split('T')[0] : prev.memberSince,
         }));
+        console.log('Profile loaded from backend successfully');
       }
     } catch (err) {
       console.error('Failed to load profile from backend:', err);
-      // Continue with local data if backend fails
+      // Show error but continue with local data
       setError('Could not load profile from server. Using local data.');
     } finally {
       setLoading(false);

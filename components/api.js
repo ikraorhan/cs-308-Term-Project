@@ -305,6 +305,26 @@ async function productManagerRequest(endpoint, options = {}) {
   }
 }
 
+/**
+ * Products API (for customer-facing product listing)
+ */
+export const productsAPI = {
+  /**
+   * Get products with optional filters
+   * @param {Object} params - { category, search, sort }
+   */
+  async getProducts(params = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.category) queryParams.append('category', params.category);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.sort) queryParams.append('sort', params.sort);
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/products/${queryString ? `?${queryString}` : ''}`;
+    return productManagerRequest(endpoint);
+  },
+};
+
 export const productManagerAPI = {
   /**
    * Get dashboard statistics
@@ -491,6 +511,71 @@ export const productManagerAPI = {
    */
   async getOrderHistory(email) {
     return productManagerRequest(`/orders/history/?email=${encodeURIComponent(email)}`);
+  },
+
+  /**
+   * Apply discount to products
+   * @param {Object} discountData - { product_ids: [1,2,3], discount_rate: 20, discount_start_date: optional, discount_end_date: optional }
+   */
+  async applyDiscount(discountData) {
+    return productManagerRequest('/sales/discount/apply/', {
+      method: 'POST',
+      body: JSON.stringify(discountData),
+    });
+  },
+
+  /**
+   * Remove discount from products
+   * @param {Array} productIds - Array of product IDs
+   */
+  async removeDiscount(productIds) {
+    return productManagerRequest('/sales/discount/remove/', {
+      method: 'POST',
+      body: JSON.stringify({ product_ids: productIds }),
+    });
+  },
+
+  /**
+   * Get all discounted products
+   */
+  async getDiscountedProducts() {
+    return productManagerRequest('/sales/discount/products/');
+  },
+
+  /**
+   * Get user wishlist
+   * @param {string} userId - User ID (optional)
+   * @param {string} email - User email (optional)
+   */
+  async getWishlist(userId = null, email = null) {
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (email) params.append('email', email);
+    const query = params.toString();
+    return productManagerRequest(`/wishlist/${query ? '?' + query : ''}`);
+  },
+
+  /**
+   * Add product to wishlist
+   * @param {Object} wishlistData - { user_id, user_email, product_id, product_name }
+   */
+  async addToWishlist(wishlistData) {
+    return productManagerRequest('/wishlist/add/', {
+      method: 'POST',
+      body: JSON.stringify(wishlistData),
+    });
+  },
+
+  /**
+   * Remove product from wishlist
+   * @param {string} userId - User ID
+   * @param {number} productId - Product ID
+   */
+  async removeFromWishlist(userId, productId) {
+    return productManagerRequest('/wishlist/remove/', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, product_id: productId }),
+    });
   },
 };
 

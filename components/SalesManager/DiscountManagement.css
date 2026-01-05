@@ -1,0 +1,133 @@
+.discount-management-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.discount-management-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  color: #333;
+  text-align: center;
+}
+
+.discount-error {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #fcc;
+}
+
+.discount-success {
+  background-color: #efe;
+  color: #3c3;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #cfc;
+}
+
+.discount-test-section {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 25px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.discount-test-section h2 {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #444;
+  border-bottom: 2px solid #4a90e2;
+  padding-bottom: 10px;
+}
+
+.discount-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #555;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="datetime-local"] {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.btn-apply-discount {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.btn-apply-discount:hover:not(:disabled) {
+  background: #357abd;
+}
+
+.btn-apply-discount:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.result-section {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.result-section h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.result-details {
+  margin-top: 15px;
+}
+
+.result-details p {
+  margin: 10px 0;
+  color: #555;
+}
+
+.product-result {
+  margin-left: 20px;
+  margin-top: 5px;
+  color: #666;
+}
+
+.user-result {
+  margin-left: 20px;
+  margin-top: 5px;
+  color: #666;
+}
+
+.notified-users {
+  margin-top: 10px;
+}

@@ -19,6 +19,7 @@ import Checkout from "./components/src/Checkout";
 import OrderConfirmation from "./OrderConfirmation";
 import DeliveryDashboard from "./components/DeliveryDepartment/DeliveryDashboard";
 import OrderManagement from "./components/ProductManager/OrderManagement.jsx";
+import DiscountManagement from './components/SalesManager/DiscountManagement';
 
 // --- YENİ EKLENEN IMPORT ---
 import ProductDetail from './components/ProductDetail'; 
@@ -51,6 +52,7 @@ function App() {
             <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
             <Route path="/delivery/orders" element={<OrderManagement />} />
             <Route path="/product-manager/comments" element={<CommentApproval />} />
+            <Route path="/sales-manager/discount" element={<DiscountManagement />} />
           </Routes>
         </div>
       </Router>

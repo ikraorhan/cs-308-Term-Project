@@ -88,6 +88,7 @@ export default function Menubar() {
           <>
             <Link to="/product-manager/comments">Comment Approval</Link>
             <Link to="/delivery/dashboard">Delivery Dashboard</Link>
+            <Link to="/sales-manager/discount">Discount Management</Link>
           </>
         )}
       </div>

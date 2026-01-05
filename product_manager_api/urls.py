@@ -43,4 +43,14 @@ urlpatterns = [
     path('comments/', views.comment_list, name='comment_list'),
     path('comments/create/', views.review_create, name='review_create'),
     path('comments/<int:comment_id>/approve/', views.comment_approve, name='comment_approve'),
+    
+    # Sales Manager - Discount Management
+    path('sales/discount/apply/', views.apply_discount, name='apply_discount'),
+    path('sales/discount/remove/', views.remove_discount, name='remove_discount'),
+    path('sales/discount/products/', views.get_discounted_products, name='get_discounted_products'),
+    
+    # Wishlist
+    path('wishlist/', views.wishlist_list, name='wishlist_list'),
+    path('wishlist/add/', views.wishlist_add, name='wishlist_add'),
+    path('wishlist/remove/', views.wishlist_remove, name='wishlist_remove'),
 ]

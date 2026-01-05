@@ -17,13 +17,18 @@ from .models import Product # Import Product model
 
 # Import Review and Order models
 try:
-    from .models import Review, Order, OrderItem
+    from .models import Review, Order, OrderItem, Wishlist
     USE_DATABASE = True
 except ImportError:
     USE_DATABASE = False
     Review = None
     Order = None
     OrderItem = None
+    Wishlist = None
+
+# Import email functionality
+from django.core.mail import send_mail
+from django.conf import settings
 
 # Mock data - Will be replaced with database in future sprints
 MOCK_PRODUCTS = [
@@ -1158,3 +1163,421 @@ def user_order_history(request):
         'orders': user_orders,
         'count': len(user_orders)
     }, status=status.HTTP_200_OK)
+
+
+# =============================
+# Sales Manager - Discount Management
+# =============================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def apply_discount(request):
+    """
+    Apply discount to selected products.
+    Request body: {
+        "product_ids": [1, 2, 3],
+        "discount_rate": 20.0,  # percentage (0-100)
+        "discount_start_date": "2024-01-01T00:00:00Z",  # optional
+        "discount_end_date": "2024-12-31T23:59:59Z"  # optional
+    }
+    """
+    try:
+        data = request.data
+        product_ids = data.get('product_ids', [])
+        discount_rate = float(data.get('discount_rate', 0))
+        
+        if not product_ids:
+            return Response(
+                {'error': 'product_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if discount_rate < 0 or discount_rate > 100:
+            return Response(
+                {'error': 'discount_rate must be between 0 and 100'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse optional dates
+        discount_start_date = None
+        discount_end_date = None
+        if data.get('discount_start_date'):
+            try:
+                discount_start_date = timezone.datetime.fromisoformat(
+                    data['discount_start_date'].replace('Z', '+00:00')
+                )
+            except:
+                pass
+        if data.get('discount_end_date'):
+            try:
+                discount_end_date = timezone.datetime.fromisoformat(
+                    data['discount_end_date'].replace('Z', '+00:00')
+                )
+            except:
+                pass
+        
+        updated_products = []
+        notified_users = []
+        
+        if USE_DATABASE and Product:
+            with transaction.atomic():
+                for product_id in product_ids:
+                    try:
+                        product = Product.objects.get(id=product_id)
+                        
+                        # Get the current price BEFORE applying discount (for display)
+                        current_display_price = float(product.price)
+                        
+                        # Apply discount - save() method will handle original_price and price calculation
+                        product.discount_rate = discount_rate
+                        product.discount_start_date = discount_start_date
+                        product.discount_end_date = discount_end_date
+                        product.save()  # save() method will:
+                        # - Save current price as original_price if not set
+                        # - Calculate new discounted price
+                        
+                        # Get the original price that was saved (for response)
+                        product.refresh_from_db()
+                        
+                        updated_products.append({
+                            'id': product.id,
+                            'name': product.name,
+                            'original_price': float(product.original_price) if product.original_price else current_display_price,
+                            'new_price': float(product.price),
+                            'discount_rate': float(product.discount_rate)
+                        })
+                        
+                        # Notify users who have this product in wishlist
+                        if discount_rate > 0 and Wishlist:
+                            wishlist_items = Wishlist.objects.filter(product_id=product_id)
+                            print(f"Found {wishlist_items.count()} wishlist items for product {product_id}")
+                            for wishlist_item in wishlist_items:
+                                try:
+                                    # Send notification email
+                                    subject = f'🎉 Special Discount on {product.name}!'
+                                    original_price = float(product.original_price) if product.original_price else float(product.price)
+                                    new_price = float(product.price)
+                                    message = f"""
+Hello!
+
+Great news! {product.name} is now on sale with {discount_rate}% off!
+
+Original Price: {original_price} TRY
+New Price: {new_price} TRY
+Discount: {discount_rate}%
+
+Don't miss this opportunity! Visit our store to purchase now.
+
+Best regards,
+PatiHouse Team
+                                    """
+                                    print(f"Attempting to send email to {wishlist_item.user_email} for product {product.name}")
+                                    send_mail(
+                                        subject,
+                                        message,
+                                        settings.DEFAULT_FROM_EMAIL,
+                                        [wishlist_item.user_email],
+                                        fail_silently=False,
+                                    )
+                                    print(f"✅ Email sent successfully to {wishlist_item.user_email}")
+                                    notified_users.append({
+                                        'email': wishlist_item.user_email,
+                                        'product_name': product.name
+                                    })
+                                except Exception as e:
+                                    error_msg = f"Error sending notification to {wishlist_item.user_email}: {str(e)}"
+                                    print(error_msg)
+                                    import traceback
+                                    traceback.print_exc()
+                                    # Still add to notified_users but mark as failed
+                                    notified_users.append({
+                                        'email': wishlist_item.user_email,
+                                        'product_name': product.name,
+                                        'error': str(e)
+                                    })
+                    
+                    except Product.DoesNotExist:
+                        continue
+        
+        return Response({
+            'message': f'Discount applied to {len(updated_products)} product(s)',
+            'updated_products': updated_products,
+            'notified_users_count': len(notified_users),
+            'notified_users': notified_users
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def remove_discount(request):
+    """
+    Remove discount from selected products.
+    Request body: {
+        "product_ids": [1, 2, 3]
+    }
+    """
+    try:
+        data = request.data
+        product_ids = data.get('product_ids', [])
+        
+        if not product_ids:
+            return Response(
+                {'error': 'product_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated_products = []
+        
+        if USE_DATABASE and Product:
+            with transaction.atomic():
+                for product_id in product_ids:
+                    try:
+                        product = Product.objects.get(id=product_id)
+                        
+                        if product.discount_rate > 0:
+                            # Restore original price
+                            if product.original_price:
+                                product.price = product.original_price
+                            product.discount_rate = 0
+                            product.original_price = None
+                            product.discount_start_date = None
+                            product.discount_end_date = None
+                            product.save()
+                            
+                            updated_products.append({
+                                'id': product.id,
+                                'name': product.name,
+                                'price': float(product.price)
+                            })
+                    
+                    except Product.DoesNotExist:
+                        continue
+        
+        return Response({
+            'message': f'Discount removed from {len(updated_products)} product(s)',
+            'updated_products': updated_products
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_discounted_products(request):
+    """Get all products that are currently on discount"""
+    try:
+        if USE_DATABASE and Product:
+            now = timezone.now()
+            products = Product.objects.filter(
+                discount_rate__gt=0
+            ).filter(
+                Q(discount_start_date__isnull=True) | Q(discount_start_date__lte=now)
+            ).filter(
+                Q(discount_end_date__isnull=True) | Q(discount_end_date__gte=now)
+            )
+            
+            discounted_products = []
+            for product in products:
+                discounted_products.append({
+                    'id': product.id,
+                    'product_name': product.name,
+                    'name': product.name,
+                    'original_price': float(product.original_price) if product.original_price else float(product.price),
+                    'current_price': float(product.current_price),
+                    'discount_rate': float(product.discount_rate),
+                    'discount_start_date': product.discount_start_date.isoformat() if product.discount_start_date else None,
+                    'discount_end_date': product.discount_end_date.isoformat() if product.discount_end_date else None,
+                })
+            
+            return Response({
+                'discounted_products': discounted_products,
+                'count': len(discounted_products)
+            }, status=status.HTTP_200_OK)
+        
+        return Response({
+            'discounted_products': [],
+            'count': 0
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# =============================
+# Wishlist Management
+# =============================
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def wishlist_list(request):
+    """Get wishlist items for a user"""
+    user_id = request.query_params.get('user_id')
+    user_email = request.query_params.get('email')
+    
+    if not user_id and not user_email:
+        return Response(
+            {'error': 'user_id or email is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        if USE_DATABASE and Wishlist:
+            if user_id:
+                wishlist_items = Wishlist.objects.filter(user_id=user_id)
+            else:
+                wishlist_items = Wishlist.objects.filter(user_email=user_email)
+            
+            items = []
+            for item in wishlist_items:
+                items.append({
+                    'id': item.id,
+                    'user_id': item.user_id,
+                    'user_email': item.user_email,
+                    'product_id': item.product_id,
+                    'product_name': item.product_name,
+                    'added_at': item.added_at.isoformat()
+                })
+            
+            return Response({
+                'wishlist': items,
+                'count': len(items)
+            }, status=status.HTTP_200_OK)
+        
+        return Response({
+            'wishlist': [],
+            'count': 0
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def wishlist_add(request):
+    """Add product to wishlist"""
+    try:
+        data = request.data
+        user_id = data.get('user_id')
+        user_email = data.get('user_email')
+        product_id = data.get('product_id')
+        product_name = data.get('product_name', '')
+        
+        if not user_id or not user_email or not product_id:
+            return Response(
+                {'error': 'user_id, user_email, and product_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if USE_DATABASE and Wishlist and Product:
+            # Check if product exists
+            try:
+                product = Product.objects.get(id=product_id)
+                if not product_name:
+                    product_name = product.name
+            except Product.DoesNotExist:
+                return Response(
+                    {'error': 'Product not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check if already in wishlist
+            wishlist_item, created = Wishlist.objects.get_or_create(
+                user_id=user_id,
+                product_id=product_id,
+                defaults={
+                    'user_email': user_email,
+                    'product_name': product_name
+                }
+            )
+            
+            if created:
+                return Response({
+                    'message': 'Product added to wishlist',
+                    'wishlist_item': {
+                        'id': wishlist_item.id,
+                        'product_id': wishlist_item.product_id,
+                        'product_name': wishlist_item.product_name
+                    }
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({
+                    'message': 'Product already in wishlist',
+                    'wishlist_item': {
+                        'id': wishlist_item.id,
+                        'product_id': wishlist_item.product_id,
+                        'product_name': wishlist_item.product_name
+                    }
+                }, status=status.HTTP_200_OK)
+        
+        return Response(
+            {'error': 'Database not available'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def wishlist_remove(request):
+    """Remove product from wishlist"""
+    try:
+        data = request.data
+        user_id = data.get('user_id')
+        product_id = data.get('product_id')
+        
+        if not user_id or not product_id:
+            return Response(
+                {'error': 'user_id and product_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if USE_DATABASE and Wishlist:
+            try:
+                wishlist_item = Wishlist.objects.get(
+                    user_id=user_id,
+                    product_id=product_id
+                )
+                wishlist_item.delete()
+                
+                return Response({
+                    'message': 'Product removed from wishlist'
+                }, status=status.HTTP_200_OK)
+            
+            except Wishlist.DoesNotExist:
+                return Response(
+                    {'error': 'Product not in wishlist'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        return Response(
+            {'error': 'Database not available'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
