@@ -14,6 +14,7 @@ from django.db.models.functions import Coalesce
 from django.db.models.functions import Coalesce
 from django.db import transaction # Import transaction
 from .models import Product # Import Product model
+from decimal import Decimal
 
 # Import Review and Order models
 try:
@@ -1184,7 +1185,7 @@ def apply_discount(request):
     try:
         data = request.data
         product_ids = data.get('product_ids', [])
-        discount_rate = float(data.get('discount_rate', 0))
+        discount_rate = Decimal(str(data.get('discount_rate', 0)))
         
         if not product_ids:
             return Response(
@@ -1257,19 +1258,28 @@ def apply_discount(request):
                                     subject = f'🎉 Special Discount on {product.name}!'
                                     original_price = float(product.original_price) if product.original_price else float(product.price)
                                     new_price = float(product.price)
+                                    savings = original_price - new_price
                                     message = f"""
 Hello!
 
-Great news! {product.name} is now on sale with {discount_rate}% off!
+🎉 Great news! A product from your wishlist is now on sale!
 
-Original Price: {original_price} TRY
-New Price: {new_price} TRY
-Discount: {discount_rate}%
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {product.name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Don't miss this opportunity! Visit our store to purchase now.
+💰 Price Details:
+   Original Price: {original_price:.2f} TRY
+   New Price: {new_price:.2f} TRY
+   You Save: {savings:.2f} TRY
+   Discount: {discount_rate}% OFF
+
+⏰ Don't miss this opportunity! Visit our store to purchase now.
 
 Best regards,
-PatiHouse Team
+PatiHouse Team 🐾
+
+Visit us at: http://localhost:5173/products
                                     """
                                     print(f"Attempting to send email to {wishlist_item.user_email} for product {product.name}")
                                     send_mail(

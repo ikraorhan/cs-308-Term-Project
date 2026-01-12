@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
+from decimal import Decimal
 
 
 class Product(models.Model):
@@ -39,8 +40,8 @@ class Product(models.Model):
             if not self.original_price:
                 # First time applying discount - save current price as original
                 self.original_price = self.price
-            # Calculate discounted price from original_price
-            discount_amount = (self.original_price * self.discount_rate) / 100
+            # Calculate discounted price from original_price (use Decimal for all operations)
+            discount_amount = (self.original_price * self.discount_rate) / Decimal('100')
             self.price = self.original_price - discount_amount
         elif self.discount_rate == 0:
             # Remove discount - restore original price
@@ -66,7 +67,7 @@ class Product(models.Model):
     def current_price(self):
         """Get current price (discounted if applicable)"""
         if self.is_on_discount and self.original_price:
-            discount_amount = (self.original_price * self.discount_rate) / 100
+            discount_amount = (self.original_price * self.discount_rate) / Decimal('100')
             return self.original_price - discount_amount
         return self.price
 

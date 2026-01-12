@@ -317,6 +317,7 @@ function ProductDetail() {
             </div>
             <p className="product-description-full">{product.description}</p>
             <div className="product-details-info">
+              <div className="detail-row"><span className="detail-label">Product ID:</span><span className="detail-value" style={{fontWeight: 'bold', color: '#7b2cbf'}}>{product.id}</span></div>
               <div className="detail-row"><span className="detail-label">Model:</span><span className="detail-value">{product.model}</span></div>
               <div className="detail-row"><span className="detail-label">Serial Number:</span><span className="detail-value">{product.serial_number}</span></div>
               <div className="detail-row"><span className="detail-label">Warranty:</span><span className="detail-value">{product.warranty_status}</span></div>
