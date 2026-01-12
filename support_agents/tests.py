@@ -3,11 +3,13 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-from .models import Conversation, Message, SupportAgent, CannedResponse
+from .models import Conversation, Message, SupportAgent, Attachment
+from io import BytesIO
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
-class SupportAgentsTestCase(TestCase):
-    """Test cases for Support Agents functionality"""
+class SupportAgentsOriginalFeaturesTestCase(TestCase):
+    """Test cases for Support Agents original features (before new additions)"""
     
     def setUp(self):
         """Set up test data"""
@@ -15,6 +17,13 @@ class SupportAgentsTestCase(TestCase):
         self.user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
+            password='testpass123'
+        )
+        
+        # Create another regular user
+        self.user2 = User.objects.create_user(
+            username='testuser2',
+            email='test2@example.com',
             password='testpass123'
         )
         
@@ -33,6 +42,7 @@ class SupportAgentsTestCase(TestCase):
         # Create API clients
         self.client = APIClient()
         self.regular_client = APIClient()
+        self.user2_client = APIClient()
         
     def test_1_create_conversation_guest_and_authenticated(self):
         """Test 1: Conversation oluşturma (guest ve authenticated user)"""
@@ -91,169 +101,137 @@ class SupportAgentsTestCase(TestCase):
         self.assertEqual(conversation.status, 'active')
         self.assertEqual(conversation.agent, self.agent)
         
-    def test_3_close_conversation(self):
-        """Test 3: Conversation kapatma"""
-        # Create an active conversation
+        # Test 2c: Agent's active conversation count should be updated
+        agent_profile = SupportAgent.objects.get(user=self.agent)
+        self.assertEqual(agent_profile.active_conversations_count, 1)
+        
+    def test_3_list_conversations_agent_and_customer_view(self):
+        """Test 3: Conversation listeleme (agent ve customer view)"""
+        # Create conversations for different users
+        conv1 = Conversation.objects.create(
+            customer=self.user,
+            status='waiting'
+        )
+        conv2 = Conversation.objects.create(
+            customer=self.user2,
+            status='active'
+        )
+        conv3 = Conversation.objects.create(
+            customer=None,
+            guest_session_id='guest_123',
+            status='waiting'
+        )
+        
+        # Test 3a: Normal user sadece kendi conversation'larını görebilir
+        self.regular_client.force_authenticate(user=self.user)
+        response = self.regular_client.get('/api/support/conversations/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], conv1.id)
+        self.assertEqual(response.data[0]['customer'], self.user.id)
+        
+        # Test 3b: Agent tüm conversation'ları görebilir
+        self.client.force_authenticate(user=self.agent)
+        response = self.client.get('/api/support/conversations/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 3)  # At least 3 conversations
+        
+        # Test 3c: Agent status filter kullanabilir
+        response = self.client.get('/api/support/conversations/?status=waiting')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for conv in response.data:
+            self.assertEqual(conv['status'], 'waiting')
+            
+    def test_4_get_conversation_details(self):
+        """Test 4: Conversation detaylarını görüntüleme"""
+        # Create a conversation with messages
+        conversation = Conversation.objects.create(
+            customer=self.user,
+            status='active'
+        )
+        
+        # Create messages
+        message1 = Message.objects.create(
+            conversation=conversation,
+            sender=self.user,
+            is_from_agent=False,
+            content='Hello, I need help'
+        )
+        message2 = Message.objects.create(
+            conversation=conversation,
+            sender=self.agent,
+            is_from_agent=True,
+            content='How can I help you?'
+        )
+        
+        # Test 4a: Customer kendi conversation'ını görebilir
+        self.regular_client.force_authenticate(user=self.user)
+        response = self.regular_client.get(f'/api/support/conversations/{conversation.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], conversation.id)
+        self.assertEqual(len(response.data['messages']), 2)
+        
+        # Test 4b: Başka bir user conversation'ı göremez
+        self.user2_client.force_authenticate(user=self.user2)
+        response = self.user2_client.get(f'/api/support/conversations/{conversation.id}/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+        # Test 4c: Agent herhangi bir conversation'ı görebilir
+        self.client.force_authenticate(user=self.agent)
+        response = self.client.get(f'/api/support/conversations/{conversation.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], conversation.id)
+        self.assertEqual(len(response.data['messages']), 2)
+        
+        # Verify message content
+        messages = response.data['messages']
+        self.assertEqual(messages[0]['content'], 'Hello, I need help')
+        self.assertEqual(messages[0]['is_from_agent'], False)
+        self.assertEqual(messages[1]['content'], 'How can I help you?')
+        self.assertEqual(messages[1]['is_from_agent'], True)
+        
+    def test_5_get_customer_details(self):
+        """Test 5: Customer details görüntüleme (agent için)"""
+        # Create a conversation
         conversation = Conversation.objects.create(
             customer=self.user,
             agent=self.agent,
             status='active'
         )
         
-        # Test 3a: Normal user kapatamaz
+        # Test 5a: Normal user customer details göremez
         self.regular_client.force_authenticate(user=self.user)
-        response = self.regular_client.post(
-            f'/api/support/conversations/{conversation.id}/close/',
-            format='json'
+        response = self.regular_client.get(
+            f'/api/support/conversations/{conversation.id}/customer-details/'
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
-        # Test 3b: Staff/admin kapatabilir
+        # Test 5b: Agent customer details görebilir
         self.client.force_authenticate(user=self.agent)
-        response = self.client.post(
-            f'/api/support/conversations/{conversation.id}/close/',
-            format='json'
+        response = self.client.get(
+            f'/api/support/conversations/{conversation.id}/customer-details/'
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['status'], 'closed')
-        self.assertIsNotNone(response.data['closed_at'])
+        self.assertEqual(response.data['user_id'], self.user.id)
+        self.assertEqual(response.data['username'], self.user.username)
+        self.assertEqual(response.data['email'], self.user.email)
+        self.assertIn('orders', response.data)
+        self.assertIn('cart_items', response.data)
+        self.assertIn('wishlist_items', response.data)
+        self.assertIn('order_count', response.data)
+        self.assertIn('cart_item_count', response.data)
+        self.assertIn('wishlist_item_count', response.data)
         
-        # Refresh from database
-        conversation.refresh_from_db()
-        self.assertEqual(conversation.status, 'closed')
-        self.assertIsNotNone(conversation.closed_at)
-        
-    def test_4_update_conversation_priority_tags_notes(self):
-        """Test 4: Conversation güncelleme (priority, tags, notes)"""
-        # Create a conversation
-        conversation = Conversation.objects.create(
-            customer=self.user,
-            agent=self.agent,
-            status='active',
-            priority='medium',
-            tags='',
-            internal_notes=''
+        # Test 5c: Guest user conversation için customer details
+        guest_conv = Conversation.objects.create(
+            customer=None,
+            guest_session_id='guest_test',
+            status='active'
         )
-        
-        # Test 4a: Normal user güncelleyemez
-        self.regular_client.force_authenticate(user=self.user)
-        response = self.regular_client.put(
-            f'/api/support/conversations/{conversation.id}/update/',
-            {
-                'priority': 'high',
-                'tags': 'urgent,refund',
-                'internal_notes': 'Customer needs urgent help'
-            },
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        
-        # Test 4b: Staff/admin güncelleyebilir
-        self.client.force_authenticate(user=self.agent)
-        response = self.client.put(
-            f'/api/support/conversations/{conversation.id}/update/',
-            {
-                'priority': 'high',
-                'tags': 'urgent,refund',
-                'internal_notes': 'Customer needs urgent help'
-            },
-            format='json'
+        response = self.client.get(
+            f'/api/support/conversations/{guest_conv.id}/customer-details/'
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['priority'], 'high')
-        self.assertEqual(response.data['tags'], 'urgent,refund')
-        self.assertEqual(response.data['internal_notes'], 'Customer needs urgent help')
-        
-        # Refresh from database
-        conversation.refresh_from_db()
-        self.assertEqual(conversation.priority, 'high')
-        self.assertEqual(conversation.tags, 'urgent,refund')
-        self.assertEqual(conversation.internal_notes, 'Customer needs urgent help')
-        
-    def test_5_canned_responses_crud(self):
-        """Test 5: Canned responses CRUD işlemleri"""
-        # Test 5a: Normal user erişemez
-        self.regular_client.force_authenticate(user=self.user)
-        response = self.regular_client.get('/api/support/canned-responses/')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        
-        # Test 5b: Staff/admin canned response oluşturabilir
-        self.client.force_authenticate(user=self.agent)
-        response = self.client.post(
-            '/api/support/canned-responses/',
-            {
-                'title': 'Order Status',
-                'content': 'Your order is being processed.',
-                'category': 'Order'
-            },
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['title'], 'Order Status')
-        self.assertEqual(response.data['usage_count'], 0)
-        canned_response_id = response.data['id']
-        
-        # Test 5c: Canned response listelenebilmeli
-        response = self.client.get('/api/support/canned-responses/')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(len(response.data), 1)
-        
-        # Test 5d: Canned response kullanım sayısı artmalı
-        response = self.client.post(
-            f'/api/support/canned-responses/{canned_response_id}/use/',
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['usage_count'], 1)
-        
-        # Use again
-        response = self.client.post(
-            f'/api/support/canned-responses/{canned_response_id}/use/',
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['usage_count'], 2)
-        
-        # Test 5e: Canned response güncellenebilmeli
-        response = self.client.put(
-            f'/api/support/canned-responses/{canned_response_id}/',
-            {
-                'title': 'Order Status Updated',
-                'content': 'Your order has been shipped.',
-                'category': 'Order'
-            },
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['title'], 'Order Status Updated')
-        
-        # Test 5f: Canned response silinebilmeli
-        response = self.client.delete(
-            f'/api/support/canned-responses/{canned_response_id}/'
-        )
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        
-        # Verify it's deleted - check list doesn't contain it
-        response = self.client.get('/api/support/canned-responses/')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        remaining_ids = [item['id'] for item in response.data]
-        self.assertNotIn(canned_response_id, remaining_ids)
-        
-        # Test 5g: Category filter çalışmalı
-        # Create another response with different category
-        response = self.client.post(
-            '/api/support/canned-responses/',
-            {
-                'title': 'Refund Policy',
-                'content': 'Refunds are processed within 5-7 business days.',
-                'category': 'Refund'
-            },
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
-        # Filter by category
-        response = self.client.get('/api/support/canned-responses/?category=Refund')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['category'], 'Refund')
+        self.assertEqual(response.data['username'], 'Guest User')
+        self.assertIsNone(response.data['user_id'])
+        self.assertEqual(response.data['order_count'], 0)
