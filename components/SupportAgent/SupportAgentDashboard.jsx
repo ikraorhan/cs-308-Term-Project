@@ -16,6 +16,17 @@ function SupportAgentDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  
+  // New features state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [cannedResponses, setCannedResponses] = useState([]);
+  const [showCannedResponses, setShowCannedResponses] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [internalNotes, setInternalNotes] = useState('');
+  const [tags, setTags] = useState('');
+  const [priority, setPriority] = useState('medium');
 
   // Check authentication and staff status on mount
   useEffect(() => {
@@ -40,6 +51,7 @@ function SupportAgentDashboard() {
     // User is authorized
     setIsAuthorized(true);
     loadConversations();
+    loadCannedResponses();
   }, [navigate]);
 
   // Set up conversation refresh interval (only when authorized)
@@ -102,7 +114,13 @@ function SupportAgentDashboard() {
 
   const loadConversations = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/`, {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (statusFilter) params.append('status', statusFilter);
+      if (priorityFilter) params.append('priority', priorityFilter);
+      
+      const url = `${API_BASE_URL}/conversations/${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url, {
         credentials: 'include'
       });
       if (response.ok) {
@@ -111,6 +129,20 @@ function SupportAgentDashboard() {
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
+    }
+  };
+  
+  const loadCannedResponses = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/canned-responses/`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCannedResponses(data);
+      }
+    } catch (error) {
+      console.error('Error loading canned responses:', error);
     }
   };
 
@@ -330,6 +362,97 @@ function SupportAgentDashboard() {
       fileInputRef.current.value = '';
     }
   };
+  
+  const closeConversation = async () => {
+    if (!selectedConversation || selectedConversation.status === 'closed') return;
+    
+    if (!window.confirm('Are you sure you want to close this conversation?')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/conversations/${selectedConversation.id}/close/`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedConversation(data);
+        loadConversations();
+        alert('Conversation closed successfully');
+      } else {
+        alert('Failed to close conversation');
+      }
+    } catch (error) {
+      console.error('Error closing conversation:', error);
+      alert('Error closing conversation');
+    }
+  };
+  
+  const updateConversation = async () => {
+    if (!selectedConversation) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/conversations/${selectedConversation.id}/update/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          priority: priority,
+          tags: tags,
+          internal_notes: internalNotes
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedConversation(data);
+        loadConversations();
+        setShowNotesModal(false);
+        alert('Conversation updated successfully');
+      } else {
+        alert('Failed to update conversation');
+      }
+    } catch (error) {
+      console.error('Error updating conversation:', error);
+      alert('Error updating conversation');
+    }
+  };
+  
+  const useCannedResponse = async (responseId, content) => {
+    if (!ws || !isConnected) return;
+    
+    // Use the canned response
+    setInputMessage(content);
+    
+    // Increment usage count
+    try {
+      await fetch(`${API_BASE_URL}/canned-responses/${responseId}/use/`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      loadCannedResponses(); // Refresh to update usage count
+    } catch (error) {
+      console.error('Error using canned response:', error);
+    }
+    
+    setShowCannedResponses(false);
+  };
+  
+  useEffect(() => {
+    if (selectedConversation) {
+      setPriority(selectedConversation.priority || 'medium');
+      setTags(selectedConversation.tags || '');
+      setInternalNotes(selectedConversation.internal_notes || '');
+    }
+  }, [selectedConversation]);
+  
+  useEffect(() => {
+    loadConversations();
+  }, [searchQuery, statusFilter, priorityFilter]);
 
   const waitingConversations = conversations.filter(c => c.status === 'waiting');
   const activeConversations = conversations.filter(c => c.status === 'active');
@@ -363,6 +486,38 @@ function SupportAgentDashboard() {
       <div className="dashboard-content">
         {/* Conversation List */}
         <div className="conversation-list">
+          {/* Search and Filters */}
+          <div className="search-filters">
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Status</option>
+              <option value="waiting">Waiting</option>
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+            </select>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          
           <div className="conversation-section">
             <h2>Waiting ({waitingConversations.length})</h2>
             {waitingConversations.map(conv => (
@@ -374,7 +529,14 @@ function SupportAgentDashboard() {
                 }}
               >
                 <div className="conversation-header">
-                  <strong>{conv.customer_name}</strong>
+                  <div>
+                    <strong>{conv.customer_name}</strong>
+                    {conv.priority && (
+                      <span className={`priority-badge priority-${conv.priority}`} style={{ marginLeft: '8px', fontSize: '10px' }}>
+                        {conv.priority}
+                      </span>
+                    )}
+                  </div>
                   <button 
                     className="claim-button"
                     onClick={(e) => {
@@ -407,8 +569,15 @@ function SupportAgentDashboard() {
                 onClick={() => setSelectedConversation(conv)}
               >
                 <div className="conversation-header">
-                  <strong>{conv.customer_name}</strong>
-                  {conv.agent_name && <span className="agent-badge">You</span>}
+                  <div>
+                    <strong>{conv.customer_name}</strong>
+                    {conv.priority && (
+                      <span className={`priority-badge priority-${conv.priority}`} style={{ marginLeft: '8px', fontSize: '10px' }}>
+                        {conv.priority}
+                      </span>
+                    )}
+                    {conv.agent_name && <span className="agent-badge">You</span>}
+                  </div>
                 </div>
                 <div className="conversation-meta">
                   <span>{new Date(conv.updated_at).toLocaleString()}</span>
@@ -431,13 +600,41 @@ function SupportAgentDashboard() {
               <div className="chat-header">
                 <div>
                   <h3>{selectedConversation.customer_name}</h3>
-                  <span className={`status-badge ${selectedConversation.status}`}>
-                    {selectedConversation.status}
-                  </span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                    <span className={`status-badge ${selectedConversation.status}`}>
+                      {selectedConversation.status}
+                    </span>
+                    <span className={`priority-badge priority-${selectedConversation.priority || 'medium'}`}>
+                      {selectedConversation.priority || 'medium'}
+                    </span>
+                    {selectedConversation.tags && (
+                      <span className="tags-badge">
+                        {selectedConversation.tags.split(',').slice(0, 2).join(', ')}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="connection-status">
-                  <span className={`status-indicator ${isConnected ? 'online' : 'offline'}`}></span>
-                  {isConnected ? 'Connected' : 'Connecting...'}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => setShowNotesModal(true)}
+                    className="notes-button"
+                    title="View/Edit Notes"
+                  >
+                    📝
+                  </button>
+                  {selectedConversation.status !== 'closed' && (
+                    <button
+                      onClick={closeConversation}
+                      className="close-conversation-button"
+                      title="Close Conversation"
+                    >
+                      ✕ Close
+                    </button>
+                  )}
+                  <div className="connection-status">
+                    <span className={`status-indicator ${isConnected ? 'online' : 'offline'}`}></span>
+                    {isConnected ? 'Connected' : 'Connecting...'}
+                  </div>
                 </div>
               </div>
 
@@ -540,9 +737,44 @@ function SupportAgentDashboard() {
                   <button 
                     className="file-button"
                     onClick={() => fileInputRef.current?.click()}
+                    title="Attach file"
                   >
                     📎
                   </button>
+                  <button
+                    className="canned-button"
+                    onClick={() => setShowCannedResponses(!showCannedResponses)}
+                    title="Canned Responses"
+                  >
+                    💬
+                  </button>
+                  {showCannedResponses && (
+                    <div className="canned-responses-dropdown">
+                      <div className="canned-responses-header">
+                        <strong>Canned Responses</strong>
+                        <button onClick={() => setShowCannedResponses(false)}>✕</button>
+                      </div>
+                      {cannedResponses.length === 0 ? (
+                        <div className="no-canned-responses">No canned responses available</div>
+                      ) : (
+                        <div className="canned-responses-list">
+                          {cannedResponses.map((response) => (
+                            <div
+                              key={response.id}
+                              className="canned-response-item"
+                              onClick={() => useCannedResponse(response.id, response.content)}
+                            >
+                              <div className="canned-response-title">{response.title}</div>
+                              <div className="canned-response-content">{response.content.substring(0, 50)}...</div>
+                              {response.category && (
+                                <div className="canned-response-category">{response.category}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <input
                     type="text"
                     value={inputMessage}
@@ -667,6 +899,61 @@ function SupportAgentDashboard() {
                 )}
               </>
             )}
+          </div>
+        )}
+        
+        {/* Notes Modal */}
+        {showNotesModal && selectedConversation && (
+          <div className="modal-overlay" onClick={() => setShowNotesModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Conversation Details</h3>
+                <button onClick={() => setShowNotesModal(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Priority</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    className="form-select"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="e.g., order, refund, technical"
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Internal Notes (not visible to customer)</label>
+                  <textarea
+                    value={internalNotes}
+                    onChange={(e) => setInternalNotes(e.target.value)}
+                    placeholder="Add internal notes about this conversation..."
+                    className="form-textarea"
+                    rows="5"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button onClick={() => setShowNotesModal(false)} className="cancel-button">
+                  Cancel
+                </button>
+                <button onClick={updateConversation} className="save-button">
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

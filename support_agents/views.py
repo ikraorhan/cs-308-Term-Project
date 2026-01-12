@@ -9,14 +9,16 @@ from django.contrib.auth.models import User
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
-from .models import Conversation, Message, Attachment, SupportAgent
+from .models import Conversation, Message, Attachment, SupportAgent, CannedResponse
 from .serializers import (
     ConversationSerializer, 
     ConversationListSerializer,
     MessageSerializer,
     AttachmentSerializer,
-    CustomerDetailsSerializer
+    CustomerDetailsSerializer,
+    CannedResponseSerializer
 )
+from django.db.models import Q
 from api.models import Order as ApiOrder, OrderItem, Cart, CartItem, Wishlist, WishlistItem
 from product_manager_api.models import Product, Order as PMOrder
 
@@ -74,15 +76,37 @@ def create_conversation(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_conversations(request):
-    """List conversations - different views for agents vs customers"""
+    """List conversations - different views for agents vs customers with search and filter"""
     try:
         if is_support_agent(request.user):
             # Agent view: all conversations
-            status_filter = request.query_params.get('status', None)
             conversations = Conversation.objects.all()
             
+            # Search functionality
+            search_query = request.query_params.get('search', None)
+            if search_query:
+                conversations = conversations.filter(
+                    Q(customer__username__icontains=search_query) |
+                    Q(customer__email__icontains=search_query) |
+                    Q(guest_session_id__icontains=search_query) |
+                    Q(tags__icontains=search_query) |
+                    Q(messages__content__icontains=search_query)
+                ).distinct()
+            
+            # Filter by status
+            status_filter = request.query_params.get('status', None)
             if status_filter:
                 conversations = conversations.filter(status=status_filter)
+            
+            # Filter by priority
+            priority_filter = request.query_params.get('priority', None)
+            if priority_filter:
+                conversations = conversations.filter(priority=priority_filter)
+            
+            # Filter by agent
+            agent_filter = request.query_params.get('agent', None)
+            if agent_filter:
+                conversations = conversations.filter(agent__username=agent_filter)
             
             # Show waiting conversations first, then active, then closed
             conversations = conversations.order_by(
@@ -374,4 +398,137 @@ def upload_file(request):
         import traceback
         print(f"File upload error: {str(e)}")
         print(traceback.format_exc())
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def close_conversation(request, conversation_id):
+    """Close a conversation"""
+    try:
+        if not is_support_agent(request.user):
+            return Response({'error': 'Only support agents can close conversations'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+        
+        if conversation.status == 'closed':
+            return Response({'error': 'Conversation is already closed'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+
+        conversation.status = 'closed'
+        conversation.closed_at = timezone.now()
+        conversation.save()
+
+        # Update agent's active conversation count
+        if conversation.agent:
+            agent_profile, _ = SupportAgent.objects.get_or_create(user=conversation.agent)
+            agent_profile.active_conversations_count = Conversation.objects.filter(
+                agent=conversation.agent, status='active'
+            ).count()
+            agent_profile.save()
+
+        serializer = ConversationSerializer(conversation)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_conversation(request, conversation_id):
+    """Update conversation (priority, tags, internal_notes)"""
+    try:
+        if not is_support_agent(request.user):
+            return Response({'error': 'Only support agents can update conversations'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+        
+        # Update allowed fields
+        if 'priority' in request.data:
+            conversation.priority = request.data['priority']
+        if 'tags' in request.data:
+            conversation.tags = request.data['tags']
+        if 'internal_notes' in request.data:
+            conversation.internal_notes = request.data['internal_notes']
+        
+        conversation.save()
+
+        serializer = ConversationSerializer(conversation)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def canned_responses(request):
+    """List or create canned responses"""
+    try:
+        if not is_support_agent(request.user):
+            return Response({'error': 'Only support agents can manage canned responses'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        if request.method == 'GET':
+            category = request.query_params.get('category', None)
+            responses = CannedResponse.objects.all()
+            
+            if category:
+                responses = responses.filter(category=category)
+            
+            serializer = CannedResponseSerializer(responses, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        elif request.method == 'POST':
+            serializer = CannedResponseSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(created_by=request.user)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def canned_response_detail(request, response_id):
+    """Update or delete a canned response"""
+    try:
+        if not is_support_agent(request.user):
+            return Response({'error': 'Only support agents can manage canned responses'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        response_obj = get_object_or_404(CannedResponse, id=response_id)
+        
+        if request.method == 'PUT':
+            serializer = CannedResponseSerializer(response_obj, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        elif request.method == 'DELETE':
+            response_obj.delete()
+            return Response({'message': 'Canned response deleted'}, status=status.HTTP_204_NO_CONTENT)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def use_canned_response(request, response_id):
+    """Increment usage count for a canned response"""
+    try:
+        if not is_support_agent(request.user):
+            return Response({'error': 'Only support agents can use canned responses'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        response_obj = get_object_or_404(CannedResponse, id=response_id)
+        response_obj.usage_count += 1
+        response_obj.save()
+        
+        serializer = CannedResponseSerializer(response_obj)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
