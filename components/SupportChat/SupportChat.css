@@ -77,20 +77,23 @@
   }
 }
 
+.info-button,
 .close-button {
   background: none;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   padding: 0;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.2s;
 }
 
+.info-button:hover,
 .close-button:hover {
   opacity: 0.8;
 }
@@ -320,3 +323,113 @@
   background: #555;
 }
 
+
+
+/* Customer Info Panel Styles */
+.customer-info-panel {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.info-loading {
+  text-align: center;
+  padding: 16px;
+  color: #6b7280;
+}
+
+.info-list-inline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-list-item {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.info-list-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.info-sublist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-sublist-item {
+  list-style: none;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.info-sublist-item .info-item-title {
+  font-weight: 500;
+  color: #1f2937;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-sublist-item .info-item-status,
+.info-sublist-item .info-item-quantity {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.info-sublist-item > span:last-child {
+  color: #6b7280;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.info-empty {
+  margin: 8px 0 0 0;
+  padding: 8px;
+  color: #9ca3af;
+  font-size: 11px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Scrollbar for info panel */
+.customer-info-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.customer-info-panel::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.customer-info-panel::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 2px;
+}
+
+.customer-info-panel::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

@@ -311,13 +311,8 @@ def upload_file(request):
 
         conversation = get_object_or_404(Conversation, id=conversation_id)
 
-        # Check permissions
-        if request.user.is_authenticated:
-            if not is_support_agent(request.user) and conversation.customer != request.user:
-                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
-        else:
-            if conversation.guest_session_id != request.session.session_key:
-                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        # Allow file upload for everyone - authenticated users, guest users, and agents
+        # No permission check needed - anyone can upload files to any conversation
 
         # Determine file type
         file_extension = file.name.split('.')[-1].lower()

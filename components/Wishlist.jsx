@@ -38,6 +38,9 @@ function Wishlist() {
     try {
       await wishlistAPI.removeFromWishlist(itemId);
       setWishlistItems(prev => prev.filter(item => item.id !== itemId));
+      
+      // Dispatch custom event for wishlist update
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     } catch (err) {
       console.error('Error removing from wishlist:', err);
       alert('Failed to remove item from wishlist');

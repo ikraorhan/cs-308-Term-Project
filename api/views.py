@@ -658,7 +658,7 @@ def merge_cart(request):
         return Response({
             'error': 'Failed to merge cart',
             'detail': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
 
 
 # Wishlist endpoints

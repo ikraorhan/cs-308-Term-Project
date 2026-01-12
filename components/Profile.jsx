@@ -177,7 +177,7 @@ function Profile() {
       const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
       if (isAuthenticated) {
         // Only show error if user is logged in but backend call failed
-        setError('Could not load profile from server. Using local data.');
+      setError('Could not load profile from server. Using local data.');
       }
       // If not authenticated, silently use local data
     } finally {

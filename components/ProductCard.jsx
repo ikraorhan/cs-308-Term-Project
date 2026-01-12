@@ -62,6 +62,9 @@ function ProductCard({ product }) {
         });
         setIsInWishlist(true);
       }
+      
+      // Dispatch custom event for wishlist update
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     } catch (error) {
       console.error('Error updating wishlist:', error);
     }

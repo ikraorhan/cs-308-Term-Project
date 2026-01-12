@@ -228,6 +228,9 @@ export function CartProvider({ children }) {
         // Don't show error to user, local cart is already updated
       }
     }
+    
+    // Dispatch custom event for cart update
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
   };
 
   const removeFromCart = async (productId) => {
@@ -251,6 +254,9 @@ export function CartProvider({ children }) {
         loadCartFromBackend();
       }
     }
+    
+    // Dispatch custom event for cart update
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
   };
 
   const updateQuantity = async (productId, newQuantity) => {
@@ -260,19 +266,19 @@ export function CartProvider({ children }) {
     }
 
     const item = cartItems.find((entry) => entry.id === productId);
-    if (!item) {
+      if (!item) {
       return;
-    }
+      }
 
-    const { maxQuantity } = item;
-    if (maxQuantity !== null && maxQuantity !== undefined && newQuantity > maxQuantity) {
-      showNotification(`Only ${maxQuantity} unit(s) of ${item.name} available.`);
+      const { maxQuantity } = item;
+      if (maxQuantity !== null && maxQuantity !== undefined && newQuantity > maxQuantity) {
+        showNotification(`Only ${maxQuantity} unit(s) of ${item.name} available.`);
       return;
-    }
+      }
 
-    if (item.quantity === newQuantity) {
+      if (item.quantity === newQuantity) {
       return;
-    }
+      }
 
     // Update local state first
     setCartItems((prev) => 
@@ -292,11 +298,15 @@ export function CartProvider({ children }) {
         loadCartFromBackend();
       }
     }
+    
+    // Dispatch custom event for cart update
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
   };
 
   const clearCart = async () => {
     setCartItems([]);
     showNotification("Cart has been cleared.");
+    saveToStorage([]);
 
     // Sync with backend if user is authenticated
     const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
@@ -309,6 +319,9 @@ export function CartProvider({ children }) {
         loadCartFromBackend();
       }
     }
+    
+    // Dispatch custom event for cart update
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
   };
 
   const clearNotification = () => setNotification("");

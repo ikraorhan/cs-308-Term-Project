@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './SupportChat.css';
+import { productManagerAPI, cartAPI, wishlistAPI } from '../api';
 
 const API_BASE_URL = 'http://localhost:8000/api/support';
 
@@ -14,6 +15,13 @@ function SupportChat() {
   const fileInputRef = useRef(null);
   const wasAuthenticatedRef = useRef(false);
   const wsRef = useRef(null); // Use ref to always have current WebSocket
+  
+  // Customer info states
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [cartItems, setCartItems] = useState([]);
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [infoLoading, setInfoLoading] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -181,6 +189,101 @@ function SupportChat() {
     wasAuthenticatedRef.current = wasAuthenticated;
   }, []);
 
+  const loadCustomerInfo = useCallback(async () => {
+    try {
+      setInfoLoading(true);
+      const userEmail = localStorage.getItem('user_email');
+      if (!userEmail) {
+        return;
+      }
+
+      // Load orders
+      try {
+        const ordersResponse = await productManagerAPI.getOrderHistory(userEmail);
+        if (ordersResponse.data && ordersResponse.data.orders) {
+          setOrders(ordersResponse.data.orders.slice(0, 5)); // Show last 5 orders
+        }
+      } catch (err) {
+        console.error('Failed to load orders:', err);
+      }
+
+      // Load cart
+      try {
+        const cartResponse = await cartAPI.getCart();
+        if (cartResponse.data && cartResponse.data.items) {
+          setCartItems(cartResponse.data.items);
+        }
+      } catch (err) {
+        console.error('Failed to load cart:', err);
+      }
+
+      // Load wishlist
+      try {
+        const wishlistResponse = await wishlistAPI.getWishlist();
+        if (wishlistResponse.data && wishlistResponse.data.items) {
+          setWishlistItems(wishlistResponse.data.items);
+        }
+      } catch (err) {
+        console.error('Failed to load wishlist:', err);
+      }
+    } catch (err) {
+      console.error('Failed to load customer info:', err);
+    } finally {
+      setInfoLoading(false);
+    }
+  }, []);
+
+  // Load customer info when chat opens and user is authenticated
+  useEffect(() => {
+    if (isOpen) {
+      const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
+      if (isAuthenticated) {
+        loadCustomerInfo();
+      }
+    }
+  }, [isOpen, loadCustomerInfo]);
+
+  // Reload customer info when info panel is opened
+  useEffect(() => {
+    if (showInfoPanel && isOpen) {
+      const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
+      if (isAuthenticated) {
+        loadCustomerInfo();
+      }
+    }
+  }, [showInfoPanel, isOpen, loadCustomerInfo]);
+
+  // Listen for cart and wishlist update events
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      // Only refresh if info panel is open and user is authenticated
+      if (showInfoPanel && isOpen) {
+        const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
+        if (isAuthenticated) {
+          loadCustomerInfo();
+        }
+      }
+    };
+
+    const handleWishlistUpdate = () => {
+      // Only refresh if info panel is open and user is authenticated
+      if (showInfoPanel && isOpen) {
+        const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
+        if (isAuthenticated) {
+          loadCustomerInfo();
+        }
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+    };
+  }, [showInfoPanel, isOpen, loadCustomerInfo]);
+
   // Close chat on logout (only when transitioning from authenticated to unauthenticated)
   useEffect(() => {
     const checkAuthStatus = () => {
@@ -220,7 +323,24 @@ function SupportChat() {
       wasAuthenticatedRef.current = isAuthenticated;
     };
 
-    // Listen for storage changes (logout)
+    // Handle logout event (same tab)
+    const handleLogout = () => {
+      // Immediately close chat when logout event is received
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setIsOpen(false);
+      setConversationId(null);
+      setMessages([]);
+      setInputMessage('');
+      setIsConnected(false);
+      setIsTyping(false);
+      sessionStorage.removeItem('guest_session_id');
+      wasAuthenticatedRef.current = false;
+    };
+
+    // Listen for storage changes (logout in different tab)
     const handleStorageChange = (e) => {
       if (e.key === 'is_authenticated' || e.key === null) {
         checkAuthStatus();
@@ -234,10 +354,12 @@ function SupportChat() {
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('userLoggedOut', handleLogout);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('userLoggedOut', handleLogout);
     };
   }, [isOpen]);
 
@@ -245,6 +367,8 @@ function SupportChat() {
     try {
       const userId = localStorage.getItem('user_id');
       const guestSessionId = !userId ? getOrCreateSessionId() : null;
+
+      console.log('[CREATE CONVERSATION] Guest session ID:', guestSessionId);
 
       // Always create a fresh conversation - don't reuse old ones
       const response = await fetch(`${API_BASE_URL}/conversations/create/`, {
@@ -271,10 +395,13 @@ function SupportChat() {
   };
 
   const getOrCreateSessionId = () => {
-    // Always generate a new session ID for guest users to ensure new conversation
-    // This ensures each chat session creates a new conversation instead of reusing old ones
-    const sessionId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    sessionStorage.setItem('guest_session_id', sessionId);
+    // Get existing session ID if available, otherwise create new one
+    let sessionId = sessionStorage.getItem('guest_session_id');
+    if (!sessionId) {
+      // Generate a new session ID for guest users
+      sessionId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      sessionStorage.setItem('guest_session_id', sessionId);
+    }
     return sessionId;
   };
 
@@ -335,6 +462,13 @@ function SupportChat() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('conversation_id', conversationId.toString());
+    
+    // Add guest_session_id if user is not authenticated
+    const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
+    if (!isAuthenticated) {
+      const guestSessionId = getOrCreateSessionId();
+      formData.append('guest_session_id', guestSessionId);
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/upload/`, {
@@ -394,6 +528,15 @@ function SupportChat() {
               <span className={`status-indicator ${isConnected ? 'online' : 'offline'}`}></span>
               {isConnected ? 'Connected' : 'Connecting...'}
             </div>
+            {localStorage.getItem('is_authenticated') === 'true' && (
+              <button 
+                className="info-button"
+                onClick={() => setShowInfoPanel(!showInfoPanel)}
+                title="View my orders, cart, and wishlist"
+              >
+                ℹ️
+              </button>
+            )}
             <button 
               className="close-button"
               onClick={() => setIsOpen(false)}
@@ -505,6 +648,88 @@ function SupportChat() {
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Customer Info Panel */}
+          {showInfoPanel && localStorage.getItem('is_authenticated') === 'true' && (
+            <div className="customer-info-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>My Information</span>
+                <button
+                  onClick={loadCustomerInfo}
+                  disabled={infoLoading}
+                  style={{
+                    padding: '4px 8px',
+                    background: '#5c0f4e',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: infoLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '11px',
+                    opacity: infoLoading ? 0.6 : 1
+                  }}
+                  title="Refresh"
+                >
+                  {infoLoading ? '...' : '↻'}
+                </button>
+              </div>
+              {infoLoading ? (
+                <div className="info-loading">Loading...</div>
+              ) : (
+                <ul className="info-list-inline">
+                  <li className="info-list-item">
+                    <span className="info-list-label">Recent Orders ({orders.length})</span>
+                    {orders.length > 0 ? (
+                      <ul className="info-sublist">
+                        {orders.map((order) => (
+                          <li key={order.delivery_id || order.id} className="info-sublist-item">
+                            <span className="info-item-title">{order.delivery_id || `Order #${order.id}`}</span>
+                            <span className="info-item-status">{order.status || 'N/A'}</span>
+                            <span>{new Date(order.order_date || order.created_at).toLocaleDateString()}</span>
+                            <span>{parseFloat(order.total_price || 0).toFixed(2)} TRY</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="info-empty">No orders yet</p>
+                    )}
+                  </li>
+
+                  <li className="info-list-item">
+                    <span className="info-list-label">Carts ({cartItems.length})</span>
+                    {cartItems.length > 0 ? (
+                      <ul className="info-sublist">
+                        {cartItems.map((item) => (
+                          <li key={item.id} className="info-sublist-item">
+                            <span className="info-item-title">{item.product_name}</span>
+                            <span className="info-item-quantity">Qty: {item.quantity}</span>
+                            <span>{parseFloat(item.price).toFixed(2)} TRY</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="info-empty">Cart is empty</p>
+                    )}
+                  </li>
+
+                  <li className="info-list-item">
+                    <span className="info-list-label">Wishlist ({wishlistItems.length})</span>
+                    {wishlistItems.length > 0 ? (
+                      <ul className="info-sublist">
+                        {wishlistItems.map((item) => (
+                          <li key={item.id} className="info-sublist-item">
+                            <span className="info-item-title">{item.product_name}</span>
+                            <span>{parseFloat(item.price).toFixed(2)} TRY</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="info-empty">Wishlist is empty</p>
+                    )}
+                  </li>
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="support-chat-input">
             <input

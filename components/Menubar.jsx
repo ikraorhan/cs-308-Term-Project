@@ -62,6 +62,7 @@ export default function Menubar() {
 
       // Dispatch custom event for chat widget to close
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('userLoggedOut'));
 
       // Navigate to login
       navigate("/login");
@@ -75,6 +76,7 @@ export default function Menubar() {
 
       // Dispatch custom event for chat widget to close
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('userLoggedOut'));
 
       navigate("/login");
     }
