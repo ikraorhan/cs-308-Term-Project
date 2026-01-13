@@ -56,6 +56,14 @@ function SalesDashboard() {
           </div>
         </div>
 
+        <div className="sales-stat-card prices" onClick={() => navigate('/sales-manager/prices')}>
+          <div className="sales-stat-icon">💰</div>
+          <div className="sales-stat-content">
+            <div className="sales-stat-value">Prices</div>
+            <div className="sales-stat-label">Set Product Prices</div>
+          </div>
+        </div>
+
         <div className="sales-stat-card invoices" onClick={() => navigate('/sales-manager/invoices')}>
           <div className="sales-stat-icon">📄</div>
           <div className="sales-stat-content">
@@ -78,6 +86,9 @@ function SalesDashboard() {
         <div className="sales-actions-grid">
           <button className="sales-action-btn" onClick={() => navigate('/sales-manager/discounts')}>
             Set Product Discounts
+          </button>
+          <button className="sales-action-btn" onClick={() => navigate('/sales-manager/prices')}>
+            Set Product Prices
           </button>
           <button className="sales-action-btn" onClick={() => navigate('/sales-manager/invoices')}>
             View Invoices

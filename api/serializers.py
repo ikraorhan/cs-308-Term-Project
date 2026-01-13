@@ -162,6 +162,7 @@ class UserSerializer(serializers.ModelSerializer):
             return {
                 'phone': profile.phone or '',
                 'bio': profile.bio or '',
+                'tax_id': profile.tax_id or '',
                 'role': profile.role or 'customer',
                 'loyalty_tier': profile.loyalty_tier or '',
                 'loyalty_points': profile.loyalty_points or 0,
@@ -172,6 +173,7 @@ class UserSerializer(serializers.ModelSerializer):
             return {
                 'phone': '',
                 'bio': '',
+                'tax_id': '',
                 'role': 'customer',
                 'loyalty_tier': '',
                 'loyalty_points': 0,

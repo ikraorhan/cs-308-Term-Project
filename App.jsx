@@ -32,6 +32,7 @@ import Wishlist from './components/Wishlist';
 import ProtectedRoute from './components/ProtectedRoute'; // Import ProtectedRoute
 import SalesDashboard from './components/SalesManager/SalesDashboard';
 import DiscountManagement from './components/SalesManager/DiscountManagement';
+import PriceManagement from './components/SalesManager/PriceManagement';
 import InvoiceManagement from './components/SalesManager/InvoiceManagement';
 import RevenueAnalysis from './components/SalesManager/RevenueAnalysis';
 import RefundManagement from './components/SalesManager/RefundManagement';
@@ -79,6 +80,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['sales_manager']} />}>
               <Route path="/sales-manager" element={<SalesDashboard />} />
               <Route path="/sales-manager/discounts" element={<DiscountManagement />} />
+              <Route path="/sales-manager/prices" element={<PriceManagement />} />
               <Route path="/sales-manager/invoices" element={<InvoiceManagement />} />
               <Route path="/sales-manager/revenue" element={<RevenueAnalysis />} />
               <Route path="/sales-manager/refunds" element={<RefundManagement />} />

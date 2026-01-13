@@ -559,6 +559,17 @@ export const productManagerAPI = {
   },
 
   /**
+   * Sales Manager: Set product price
+   * @param {Object} priceData - { product_id: number, price: number }
+   */
+  async setProductPrice(priceData) {
+    return productManagerRequest('/sales/price/', {
+      method: 'POST',
+      body: JSON.stringify(priceData),
+    });
+  },
+
+  /**
    * Sales Manager: Get invoices within date range
    * @param {string} startDate - Start date (YYYY-MM-DD)
    * @param {string} endDate - End date (YYYY-MM-DD)
