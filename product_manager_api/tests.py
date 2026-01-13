@@ -87,22 +87,28 @@ class SalesManagerTestCase(APITestCase):
 
     def test_set_product_discount_success(self):
         """Test 1: Sales manager can set discount on products"""
+        today = date.today()
         response = self.client.post('/sales/discounts/', {
             'product_ids': [self.product1.id],
-            'discount_percentage': 10
+            'discount_rate': 10,
+            'discount_start_date': today.isoformat(),
+            'discount_end_date': (today + timedelta(days=7)).isoformat()
         }, format='json')
         
         self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
 
     def test_set_discount_invalid_percentage(self):
         """Test 2: Discount percentage must be valid (0-100)"""
+        today = date.today()
         response = self.client.post('/sales/discounts/', {
             'product_ids': [self.product1.id],
-            'discount_percentage': 150  # Invalid percentage
+            'discount_rate': 150,  # Invalid percentage
+            'discount_start_date': today.isoformat(),
+            'discount_end_date': (today + timedelta(days=7)).isoformat()
         }, format='json')
         
-        # Could be 400 for validation error or 200 if capped
-        self.assertIn(response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_200_OK])
+        # Should be 400 for validation error
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_get_invoices_with_date_range(self):
         """Test 3: Get invoices within a date range"""
@@ -126,9 +132,12 @@ class SalesManagerTestCase(APITestCase):
 
     def test_set_discount_multiple_products(self):
         """Test 5: Set discount on multiple products at once"""
+        today = date.today()
         response = self.client.post('/sales/discounts/', {
             'product_ids': [self.product1.id, self.product2.id],
-            'discount_percentage': 15
+            'discount_rate': 15,
+            'discount_start_date': today.isoformat(),
+            'discount_end_date': (today + timedelta(days=7)).isoformat()
         }, format='json')
         
         self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
@@ -208,7 +217,7 @@ class ProductManagerTestCase(APITestCase):
 
     def test_update_stock_quantity(self):
         """Test 3: Product manager can update stock quantity"""
-        response = self.client.patch(f'/stock/{self.product.id}/', {
+        response = self.client.put(f'/stock/{self.product.id}/', {
             'quantity_in_stock': 100
         }, format='json')
         
@@ -216,7 +225,7 @@ class ProductManagerTestCase(APITestCase):
 
     def test_approve_comment(self):
         """Test 4: Product manager can approve a pending comment"""
-        response = self.client.patch(f'/comments/{self.review.id}/approve/', {
+        response = self.client.put(f'/comments/{self.review.id}/approve/', {
             'action': 'approve'
         }, format='json')
         
@@ -236,7 +245,7 @@ class ProductManagerTestCase(APITestCase):
             status='pending'
         )
         
-        response = self.client.patch(f'/comments/{review_to_reject.id}/approve/', {
+        response = self.client.put(f'/comments/{review_to_reject.id}/approve/', {
             'action': 'reject'
         }, format='json')
         
@@ -315,6 +324,10 @@ class CustomerTestCase(APITestCase):
         """Test 3: Customer can create a review for a product"""
         response = self.client.post('/comments/create/', {
             'product_id': self.product.id,
+            'product_name': self.product.name,
+            'user_id': str(self.customer.id),
+            'user_name': self.customer.username,
+            'user_email': self.customer.email,
             'rating': 5,
             'comment': 'My dog loves this ball!'
         }, format='json')
@@ -323,7 +336,7 @@ class CustomerTestCase(APITestCase):
 
     def test_get_order_history(self):
         """Test 4: Customer can view their order history"""
-        response = self.client.get('/orders/history/')
+        response = self.client.get(f'/orders/history/?email={self.customer.email}')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -341,7 +354,9 @@ class CustomerTestCase(APITestCase):
             order_date=date.today()
         )
         
-        response = self.client.post(f'/orders/{processing_order.delivery_id}/cancel/')
+        response = self.client.post(f'/orders/{processing_order.delivery_id}/cancel/', {
+            'customer_email': self.customer.email
+        }, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -450,6 +465,8 @@ class RefundTestCase(APITestCase):
         response = self.client.post('/refunds/create/', {
             'order_id': new_order.delivery_id,
             'order_item_id': new_order_item.id,
+            'product_id': self.product.id,
+            'customer_email': self.customer.email,
             'reason': 'Changed my mind',
             'quantity': 1
         }, format='json')
@@ -484,6 +501,8 @@ class RefundTestCase(APITestCase):
         response = self.client.post('/refunds/create/', {
             'order_id': old_order.delivery_id,
             'order_item_id': old_item.id,
+            'product_id': self.product.id,
+            'customer_email': self.customer.email,
             'reason': 'Too late refund',
             'quantity': 1
         }, format='json')
@@ -503,7 +522,7 @@ class RefundTestCase(APITestCase):
         """Test 4: Sales manager can approve a refund request"""
         self.client.force_authenticate(user=self.sales_manager)
         
-        response = self.client.patch(f'/refunds/{self.refund_request.id}/approve/', {
+        response = self.client.post(f'/refunds/{self.refund_request.id}/approve/', {
             'action': 'approve'
         }, format='json')
         
@@ -529,9 +548,9 @@ class RefundTestCase(APITestCase):
             status='pending'
         )
         
-        response = self.client.patch(f'/refunds/{refund_to_reject.id}/approve/', {
+        response = self.client.post(f'/refunds/{refund_to_reject.id}/approve/', {
             'action': 'reject',
-            'rejection_reason': 'Invalid refund request'
+            'evaluation_notes': 'Invalid refund request'
         }, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
