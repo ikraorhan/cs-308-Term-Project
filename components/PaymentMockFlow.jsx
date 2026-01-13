@@ -188,8 +188,8 @@ export default function PaymentMockFlow({
       return;
     }
 
-    // İsim Kontrolü (Sadece harf ve boşluk)
-    const nameRegex = /^[a-zA-Z\s]*$/;
+    // İsim Kontrolü (Sadece harf ve boşluk, Türkçe karakterler dahil)
+    const nameRegex = /^[a-zA-ZçÇğĞıİöÖşŞüÜ\s]*$/;
     if (!nameRegex.test(cardName.trim())) {
       setError("Cardholder name must contain only letters.");
       return;
