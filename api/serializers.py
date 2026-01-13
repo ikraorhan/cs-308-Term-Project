@@ -134,7 +134,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for user profile extension"""
     class Meta:
         model = User
-        fields = ('phone', 'bio', 'loyalty_tier', 'loyalty_points', 'pets_supported')
+        fields = ('phone', 'bio', 'loyalty_tier', 'loyalty_points', 'pets_supported', 'tax_id', 'home_address')
         # Note: This will be handled through UserProfile model
 
 
@@ -166,6 +166,8 @@ class UserSerializer(serializers.ModelSerializer):
                 'loyalty_tier': profile.loyalty_tier or '',
                 'loyalty_points': profile.loyalty_points or 0,
                 'pets_supported': profile.pets_supported or 0,
+                'tax_id': profile.tax_id or '',
+                'home_address': profile.home_address or '',
             }
         except:
             # If profile doesn't exist, return empty profile
@@ -176,6 +178,8 @@ class UserSerializer(serializers.ModelSerializer):
                 'loyalty_tier': '',
                 'loyalty_points': 0,
                 'pets_supported': 0,
+                'tax_id': '',
+                'home_address': '',
             }
 
 

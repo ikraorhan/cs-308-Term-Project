@@ -35,6 +35,7 @@ import DiscountManagement from './components/SalesManager/DiscountManagement';
 import InvoiceManagement from './components/SalesManager/InvoiceManagement';
 import RevenueAnalysis from './components/SalesManager/RevenueAnalysis';
 import RefundManagement from './components/SalesManager/RefundManagement';
+import ProductPriceManagement from './components/SalesManager/ProductPriceManagement';
 
 function App() {
   return (
@@ -81,6 +82,7 @@ function App() {
               <Route path="/sales-manager/discounts" element={<DiscountManagement />} />
               <Route path="/sales-manager/invoices" element={<InvoiceManagement />} />
               <Route path="/sales-manager/revenue" element={<RevenueAnalysis />} />
+              <Route path="/sales-manager/prices" element={<ProductPriceManagement />} />
               <Route path="/sales-manager/refunds" element={<RefundManagement />} />
             </Route>
 

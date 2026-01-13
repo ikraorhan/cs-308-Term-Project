@@ -10,7 +10,10 @@ const DEFAULT_PROFILE = {
   id: '1',
   name: 'Admin User',
   email: 'admin@petstore.com',
+  email: 'admin@petstore.com',
   phone: '+90 555 123 4567',
+  taxId: '',
+  homeAddress: '',
   memberSince: '2021-06-12',
   loyaltyTier: 'Gold',
   points: 12450,
@@ -141,7 +144,7 @@ function Profile() {
     try {
       setLoading(true);
       setError('');
-      
+
       // Check if user is authenticated first
       const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
       if (!isAuthenticated) {
@@ -149,7 +152,7 @@ function Profile() {
         setLoading(false);
         return;
       }
-      
+
       const response = await authAPI.getCurrentUser();
       const userData = response.data;
 
@@ -164,6 +167,8 @@ function Profile() {
           name: fullName,
           email: userData.email || prev.email,
           phone: profileData.phone || prev.phone,
+          taxId: profileData.tax_id || prev.taxId || '',
+          homeAddress: profileData.home_address || prev.homeAddress || '',
           bio: profileData.bio || prev.bio,
           loyaltyTier: profileData.loyalty_tier || prev.loyaltyTier || 'Standard',
           points: profileData.loyalty_points || prev.points || 0,
@@ -177,7 +182,7 @@ function Profile() {
       const isAuthenticated = localStorage.getItem('is_authenticated') === 'true';
       if (isAuthenticated) {
         // Only show error if user is logged in but backend call failed
-      setError('Could not load profile from server. Using local data.');
+        setError('Could not load profile from server. Using local data.');
       }
       // If not authenticated, silently use local data
     } finally {
@@ -384,6 +389,16 @@ function Profile() {
               <span>•</span>
               <span>{profile.phone}</span>
             </div>
+            {profile.taxId && (
+              <div className="profile-contact-line" style={{ marginTop: '0.5rem', fontSize: '0.9rem', opacity: 0.8 }}>
+                <span>Tax ID: {profile.taxId}</span>
+              </div>
+            )}
+            {profile.homeAddress && (
+              <div className="profile-contact-line" style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                <span>Home: {profile.homeAddress}</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="profile-badges">
