@@ -6,6 +6,7 @@ import { clearUserData } from "./api";
 export default function Menubar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,10 +19,12 @@ export default function Menubar() {
         localStorage.getItem("is_staff") === "true" ||
         localStorage.getItem("is_superuser") === "true";
       const email = localStorage.getItem("user_email") || "";
+      const role = localStorage.getItem("user_role") || "customer";
 
       setIsAuthenticated(authStatus);
       setIsAdmin(adminStatus);
       setUserEmail(email);
+      setRole(role);
     };
 
     // Check immediately
@@ -36,10 +39,12 @@ export default function Menubar() {
         localStorage.getItem("is_staff") === "true" ||
         localStorage.getItem("is_superuser") === "true";
       const email = localStorage.getItem("user_email") || "";
+      const role = localStorage.getItem("user_role") || "customer";
 
       setIsAuthenticated(authStatus);
       setIsAdmin(adminStatus);
       setUserEmail(email);
+      setRole(role);
     };
 
     window.addEventListener("storage", handleStorageChange);
@@ -58,6 +63,7 @@ export default function Menubar() {
       clearUserData();
       setIsAuthenticated(false);
       setIsAdmin(false);
+      setRole("");
       setUserEmail("");
 
       // Dispatch custom event for chat widget to close
@@ -72,6 +78,7 @@ export default function Menubar() {
       clearUserData();
       setIsAuthenticated(false);
       setIsAdmin(false);
+      setRole("");
       setUserEmail("");
 
       // Dispatch custom event for chat widget to close
@@ -95,12 +102,14 @@ export default function Menubar() {
         <Link to="/cart">Cart</Link>
         {isAuthenticated && <Link to="/wishlist">Wishlist</Link>}
         <Link to="/profile">Profile</Link>
-        {isAdmin && (
-          <>
-            <Link to="/product-manager">Product Manager</Link>
-            <Link to="/sales-manager">Sales Manager</Link>
-            <Link to="/support/dashboard">Support Dashboard</Link>
-          </>
+        {(role === 'product_manager' || role === 'admin') && (
+          <Link to="/product-manager">Product Manager</Link>
+        )}
+        {(role === 'sales_manager' || role === 'admin') && (
+          <Link to="/sales-manager">Sales Manager</Link>
+        )}
+        {(role === 'support_manager' || role === 'admin') && (
+          <Link to="/support/dashboard">Support Dashboard</Link>
         )}
       </div>
       <div className="user-section">

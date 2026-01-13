@@ -83,6 +83,7 @@ def register(request):
                     'loyalty_tier': 'Standard',
                     'loyalty_points': 0,
                     'pets_supported': 0,
+                    'role': 'customer',
                 }
             )
             # Create Wishlist for new user

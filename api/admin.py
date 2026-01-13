@@ -3,8 +3,8 @@ from .models import UserProfile, Order, OrderItem, Cart, CartItem
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'phone', 'loyalty_tier', 'loyalty_points', 'pets_supported')
-    list_filter = ('loyalty_tier',)
+    list_display = ('user', 'role', 'phone', 'loyalty_tier', 'loyalty_points')
+    list_filter = ('role', 'loyalty_tier')
     search_fields = ('user__username', 'user__email', 'phone')
     readonly_fields = ('created_at', 'updated_at')
 

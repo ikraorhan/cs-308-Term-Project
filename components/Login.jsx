@@ -18,19 +18,22 @@ function Login() {
     try {
       // Call backend API for login
       const response = await authAPI.login(email, password);
-      
+
       if (response.data && response.data.user) {
         const user = response.data.user;
-        
+
         // Store user data in localStorage
         storeUserData(user);
-        
+
         // Also store additional profile data if available
         if (user.profile) {
           localStorage.setItem('user_phone', user.profile.phone || '');
           localStorage.setItem('user_bio', user.profile.bio || '');
+          localStorage.setItem('user_role', user.profile.role || 'customer');
+        } else {
+          localStorage.setItem('user_role', 'customer');
         }
-        
+
         // Successful login - redirect to products page
         navigate('/products');
       } else {
@@ -38,7 +41,7 @@ function Login() {
       }
     } catch (error) {
       console.error('Login error:', error);
-      
+
       // Handle different error types
       if (error.response) {
         const errorData = error.response.data;
