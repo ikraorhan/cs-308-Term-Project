@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Order, OrderItem, UserProfile, Cart, CartItem
+from .models import Order, OrderItem, UserProfile, Cart, CartItem, Wishlist, WishlistItem
 from product_manager_api.models import Product
 from .serializers import (
     UserRegistrationSerializer,
@@ -24,65 +24,38 @@ from .serializers import (
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
     UserSerializer,
-    CartItemSerializer
+    CartItemSerializer,
+    WishlistItemSerializer
 )
 
 
 # ==================== INVOICE FUNCTIONS ====================
-
-def generate_invoice_pdf(order):
-    """Order bilgisinden PDF dosyası oluşturan fonksiyon."""
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-
-    # Başlık
-    p.setFont("Helvetica-Bold", 18)
-    p.drawString(50, 750, "Pet Store Invoice")
-
-    # Order bilgileri
-    p.setFont("Helvetica", 12)
-    p.drawString(50, 720, f"Order ID: {order.id}")
-    p.drawString(50, 700, f"Customer: {order.user.email}")
-    p.drawString(50, 680, f"Date: {order.created_at.strftime('%Y-%m-%d')}")
-
-    # Ürün listesi
-    y = 640
-    p.drawString(50, y, "Products:")
-    y -= 20
-
-    total = 0
-
-    for item in order.items.all():
-        line = f"{item.product_name}   x{item.quantity}   = {item.price * item.quantity} TL"
-        p.drawString(60, y, line)
-        y -= 20
-
-        total += item.price * item.quantity
-
-    # Total fiyat
-    p.drawString(50, y - 10, f"Total: {total} TL")
-
-    p.showPage()
-    p.save()
-
-    buffer.seek(0)
-    return buffer
+# Import invoice generation from product_manager_api to use consistent format
+try:
+    from product_manager_api.views import generate_invoice_pdf
+except ImportError:
+    # Fallback if import fails
+    from backend.product_manager_api.views import generate_invoice_pdf
 
 
 def send_invoice_email(order):
     """Sipariş oluşturulduğunda müşteriye PDF faturayı email ile gönderen fonksiyon."""
     pdf_buffer = generate_invoice_pdf(order)
 
+    # Get delivery_id or id for order reference
+    order_ref = getattr(order, 'delivery_id', None) or getattr(order, 'id', 'N/A')
+    customer_email = getattr(order, 'customer_email', None) or (order.user.email if hasattr(order, 'user') and order.user else None)
+
     email = EmailMessage(
-        subject=f"Your Pet Store Invoice - Order #{order.id}",
+        subject=f"Your PatiHouse Invoice - Order {order_ref}",
         body="Thank you for your order! Your invoice is attached.",
         from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'petstore.orders@gmail.com'),
-        to=[order.user.email],
+        to=[customer_email] if customer_email else [],
     )
 
     # PDF ekle
     email.attach(
-        filename=f"invoice_{order.id}.pdf",
+        filename=f"invoice_{order_ref}.pdf",
         content=pdf_buffer.getvalue(),
         mimetype="application/pdf"
     )
@@ -110,8 +83,11 @@ def register(request):
                     'loyalty_tier': 'Standard',
                     'loyalty_points': 0,
                     'pets_supported': 0,
+                    'role': 'customer',
                 }
             )
+            # Create Wishlist for new user
+            Wishlist.objects.get_or_create(user=user)
             return Response({
                 'message': 'User registered successfully',
                 'user': UserSerializer(user).data
@@ -380,6 +356,12 @@ def get_or_create_cart(user):
     """Helper function to get or create a cart for a user"""
     cart, created = Cart.objects.get_or_create(user=user)
     return cart
+
+
+def get_or_create_wishlist(user):
+    """Helper function to get or create a wishlist for a user"""
+    wishlist, created = Wishlist.objects.get_or_create(user=user)
+    return wishlist
 
 
 @api_view(['GET'])
@@ -652,3 +634,117 @@ def merge_cart(request):
             'error': 'Failed to merge cart',
             'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
+
+
+# Wishlist endpoints
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_wishlist(request):
+    """Get user's wishlist items"""
+    try:
+        wishlist = get_or_create_wishlist(request.user)
+        items = wishlist.items.all()
+        serializer = WishlistItemSerializer(items, many=True)
+        return Response({
+            'items': serializer.data,
+            'count': items.count()
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({
+            'error': 'Failed to fetch wishlist',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_to_wishlist(request):
+    """Add item to wishlist"""
+    try:
+        wishlist = get_or_create_wishlist(request.user)
+        product_id = request.data.get('product_id')
+        product_name = request.data.get('product_name', '')
+        price = request.data.get('price', 0)
+        image_url = request.data.get('image_url', '')
+        description = request.data.get('description', '')
+
+        if not product_id:
+            return Response({
+                'error': 'product_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if item already exists in wishlist
+        wishlist_item, created = WishlistItem.objects.get_or_create(
+            wishlist=wishlist,
+            product_id=product_id,
+            defaults={
+                'product_name': product_name,
+                'price': price,
+                'image_url': image_url,
+                'description': description,
+            }
+        )
+
+        if not created:
+            return Response({
+                'message': 'Item already in wishlist',
+                'item': WishlistItemSerializer(wishlist_item).data
+            }, status=status.HTTP_200_OK)
+
+        serializer = WishlistItemSerializer(wishlist_item)
+        return Response({
+            'message': 'Item added to wishlist',
+            'item': serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response({
+            'error': 'Failed to add item to wishlist',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_from_wishlist(request, item_id):
+    """Remove item from wishlist"""
+    try:
+        wishlist = get_or_create_wishlist(request.user)
+        wishlist_item = WishlistItem.objects.get(id=item_id, wishlist=wishlist)
+        wishlist_item.delete()
+        return Response({
+            'message': 'Item removed from wishlist'
+        }, status=status.HTTP_200_OK)
+
+    except WishlistItem.DoesNotExist:
+        return Response({
+            'error': 'Wishlist item not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': 'Failed to remove item from wishlist',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_from_wishlist_by_product(request, product_id):
+    """Remove item from wishlist by product_id"""
+    try:
+        wishlist = get_or_create_wishlist(request.user)
+        wishlist_item = WishlistItem.objects.get(product_id=product_id, wishlist=wishlist)
+        wishlist_item.delete()
+        return Response({
+            'message': 'Item removed from wishlist'
+        }, status=status.HTTP_200_OK)
+
+    except WishlistItem.DoesNotExist:
+        return Response({
+            'error': 'Wishlist item not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': 'Failed to remove item from wishlist',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

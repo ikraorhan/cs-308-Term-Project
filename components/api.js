@@ -183,6 +183,9 @@ export function clearUserData() {
   localStorage.removeItem('is_admin');
   localStorage.removeItem('is_staff');
   localStorage.removeItem('is_superuser');
+  localStorage.removeItem('user_role');
+  // Clear cart items when user logs out
+  localStorage.removeItem('cart_items');
 }
 
 /**
@@ -251,6 +254,49 @@ export const cartAPI = {
 };
 
 /**
+ * Wishlist API
+ */
+export const wishlistAPI = {
+  /**
+   * Get user's wishlist items
+   */
+  async getWishlist() {
+    return apiRequest('/wishlist/');
+  },
+
+  /**
+   * Add item to wishlist
+   * @param {Object} itemData - { product_id, product_name, price, image_url, description }
+   */
+  async addToWishlist(itemData) {
+    return apiRequest('/wishlist/add/', {
+      method: 'POST',
+      body: JSON.stringify(itemData),
+    });
+  },
+
+  /**
+   * Remove item from wishlist
+   * @param {number} itemId - Wishlist item ID
+   */
+  async removeFromWishlist(itemId) {
+    return apiRequest(`/wishlist/item/${itemId}/remove/`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Remove item from wishlist by product_id
+   * @param {number} productId - Product ID
+   */
+  async removeFromWishlistByProduct(productId) {
+    return apiRequest(`/wishlist/product/${productId}/remove/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+/**
  * Product Manager API
  * Base URL: http://localhost:8000/ (root level, not under /api/)
  */
@@ -274,6 +320,12 @@ async function productManagerRequest(endpoint, options = {}) {
       ...options.headers,
     },
   };
+
+  // If body is FormData, let the browser set the Content-Type header 
+  // (which will include the boundary)
+  if (options.body instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
 
   try {
     const response = await fetch(url, config);
@@ -340,9 +392,10 @@ export const productManagerAPI = {
    * @param {Object} productData - Product data
    */
   async createProduct(productData) {
+    const isFormData = productData instanceof FormData;
     return productManagerRequest('/products/', {
       method: 'POST',
-      body: JSON.stringify(productData),
+      body: isFormData ? productData : JSON.stringify(productData),
     });
   },
 
@@ -352,9 +405,10 @@ export const productManagerAPI = {
    * @param {Object} productData - Updated product data
    */
   async updateProduct(productId, productData) {
+    const isFormData = productData instanceof FormData;
     return productManagerRequest(`/products/${productId}/`, {
       method: 'PUT',
-      body: JSON.stringify(productData),
+      body: isFormData ? productData : JSON.stringify(productData),
     });
   },
 
@@ -491,6 +545,92 @@ export const productManagerAPI = {
    */
   async getOrderHistory(email) {
     return productManagerRequest(`/orders/history/?email=${encodeURIComponent(email)}`);
+  },
+
+  /**
+   * Sales Manager: Set discount on products
+   * @param {Object} discountData - { product_ids: [], discount_rate: number, discount_start_date: string, discount_end_date: string }
+   */
+  async setProductDiscount(discountData) {
+    return productManagerRequest('/sales/discounts/', {
+      method: 'POST',
+      body: JSON.stringify(discountData),
+    });
+  },
+
+  /**
+   * Sales Manager: Get invoices within date range
+   * @param {string} startDate - Start date (YYYY-MM-DD)
+   * @param {string} endDate - End date (YYYY-MM-DD)
+   */
+  async getInvoices(startDate, endDate) {
+    return productManagerRequest(`/sales/invoices/?start_date=${startDate}&end_date=${endDate}`);
+  },
+
+  /**
+   * Sales Manager: Get revenue and profit/loss
+   * @param {string} startDate - Start date (YYYY-MM-DD)
+   * @param {string} endDate - End date (YYYY-MM-DD)
+   */
+  async getRevenueProfit(startDate, endDate) {
+    return productManagerRequest(`/sales/revenue/?start_date=${startDate}&end_date=${endDate}`);
+  },
+
+  /**
+   * Create a refund request
+   * @param {Object} refundData - { order_id, order_item_id, product_id, quantity, reason, customer_email }
+   */
+  async createRefundRequest(refundData) {
+    return productManagerRequest('/refunds/create/', {
+      method: 'POST',
+      body: JSON.stringify(refundData),
+    });
+  },
+
+  /**
+   * Get refund requests
+   * @param {string|null} statusFilter - Optional status filter (pending, approved, rejected)
+   * @param {string|null} customerEmail - Optional customer email filter
+   */
+  async getRefundRequests(statusFilter = null, customerEmail = null) {
+    let endpoint = '/refunds/';
+    const params = [];
+    if (statusFilter) params.push(`status=${statusFilter}`);
+    if (customerEmail) params.push(`customer_email=${encodeURIComponent(customerEmail)}`);
+    if (params.length > 0) endpoint += `?${params.join('&')}`;
+    return productManagerRequest(endpoint);
+  },
+
+  /**
+   * Approve or reject a refund request
+   * @param {number} refundId - Refund request ID
+   * @param {string} action - 'approve' or 'reject'
+   * @param {string} evaluationNotes - Optional evaluation notes
+   * @param {string} evaluatedBy - Optional evaluator name
+   */
+  async approveRefundRequest(refundId, action, evaluationNotes = '', evaluatedBy = '') {
+    return productManagerRequest(`/refunds/${refundId}/approve/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        action,
+        evaluation_notes: evaluationNotes,
+        evaluated_by: evaluatedBy
+      }),
+    });
+  },
+
+  /**
+   * Cancel an order (only if status is 'processing')
+   * @param {string} deliveryId - Order delivery ID
+   * @param {string} customerEmail - Customer email
+   */
+  async cancelOrder(deliveryId, customerEmail) {
+    return productManagerRequest(`/orders/${deliveryId}/cancel/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_email: customerEmail
+      }),
+    });
   },
 };
 

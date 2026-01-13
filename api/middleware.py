@@ -17,7 +17,14 @@ class DisableCSRFForAPI(MiddlewareMixin):
             request.path.startswith('/stock/') or
             request.path.startswith('/categories/') or
             request.path.startswith('/delivery/') or
-            request.path.startswith('/dashboard/')):
+            request.path.startswith('/dashboard/') or
+            request.path.startswith('/sales/') or
+            request.path.startswith('/refunds/')):
             setattr(request, '_dont_enforce_csrf_checks', True)
+        
+        # Also disable CSRF for support API endpoints
+        if request.path.startswith('/api/support/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        
         return None
 

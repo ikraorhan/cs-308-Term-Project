@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { productManagerAPI } from '../api';
+import InvoiceModal from './InvoiceModal';
 import './OrderManagement.css';
 
 function OrderManagement() {
@@ -9,22 +10,29 @@ function OrderManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [dateFilter, setDateFilter] = useState(searchParams.get('date') || '');
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
   useEffect(() => {
-    // URL'den status parametresini al
+    // URL'den parametreleri al
     const statusFromUrl = searchParams.get('status');
-    if (statusFromUrl) {
-      setStatusFilter(statusFromUrl);
-    }
+    const dateFromUrl = searchParams.get('date');
+    if (statusFromUrl !== null) setStatusFilter(statusFromUrl);
+    if (dateFromUrl !== null) setDateFilter(dateFromUrl);
   }, [searchParams]);
 
   useEffect(() => {
     fetchOrders();
-  }, [statusFilter]);
+  }, [statusFilter, dateFilter]);
 
   const fetchOrders = async () => {
     try {
-      const response = await productManagerAPI.getOrders(statusFilter || null);
+      // Build params object
+      const params = {};
+      if (statusFilter) params.status = statusFilter;
+      if (dateFilter) params.date = dateFilter;
+
+      const response = await productManagerAPI.getOrders(params);
       setOrders(response.data.orders || []);
       setError('');
     } catch (err) {
@@ -103,8 +111,8 @@ function OrderManagement() {
 
             <div className="order-info">
               <div className="info-row">
-                <span className="info-label">Customer:</span>
-                <span className="info-value">{order.customer_name}</span>
+                <span className="info-label">Customer ID:</span>
+                <span className="info-value">{order.customer_id}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">Email:</span>
@@ -176,6 +184,14 @@ function OrderManagement() {
               {order.status === 'delivered' && (
                 <span className="delivery-complete">✓ Delivery Complete</span>
               )}
+
+              <button
+                className="btn-view-invoice"
+                style={{ marginLeft: '10px', padding: '5px 10px', cursor: 'pointer', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
+                onClick={() => setSelectedInvoiceOrder(order)}
+              >
+                View Invoice
+              </button>
             </div>
           </div>
         ))}
@@ -183,6 +199,13 @@ function OrderManagement() {
 
       {orders.length === 0 && (
         <div className="no-orders">No orders found.</div>
+      )}
+
+      {selectedInvoiceOrder && (
+        <InvoiceModal
+          order={selectedInvoiceOrder}
+          onClose={() => setSelectedInvoiceOrder(null)}
+        />
       )}
     </div>
   );

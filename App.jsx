@@ -21,7 +21,20 @@ import DeliveryDashboard from "./components/DeliveryDepartment/DeliveryDashboard
 import OrderManagement from "./components/ProductManager/OrderManagement.jsx";
 
 // --- YENİ EKLENEN IMPORT ---
-import ProductDetail from './components/ProductDetail'; 
+import ProductDetail from './components/ProductDetail';
+import Dashboard from './components/ProductManager/Dashboard';
+import ProductManagement from './components/ProductManager/ProductManagement';
+import CategoryManagement from './components/ProductManager/CategoryManagement';
+import StockManagement from './components/ProductManager/StockManagement';
+import SupportChat from './components/SupportChat/SupportChat';
+import SupportAgentDashboard from './components/SupportAgent/SupportAgentDashboard';
+import Wishlist from './components/Wishlist';
+import ProtectedRoute from './components/ProtectedRoute'; // Import ProtectedRoute
+import SalesDashboard from './components/SalesManager/SalesDashboard';
+import DiscountManagement from './components/SalesManager/DiscountManagement';
+import InvoiceManagement from './components/SalesManager/InvoiceManagement';
+import RevenueAnalysis from './components/SalesManager/RevenueAnalysis';
+import RefundManagement from './components/SalesManager/RefundManagement';
 
 function App() {
   return (
@@ -37,8 +50,9 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/order-history" element={<OrderHistory />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/products" element={<Products />} />
-            
+
             {/* --- YENİ EKLENEN ROUTE --- */}
             {/* :id kısmı, ürünün ID'sinin (örneğin 2) buraya geleceğini belirtir */}
             <Route path="/product/:id" element={<ProductDetail />} />
@@ -50,8 +64,32 @@ function App() {
             <Route path="/order-confirmation" element={<OrderConfirmation />} />
             <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
             <Route path="/delivery/orders" element={<OrderManagement />} />
-            <Route path="/product-manager/comments" element={<CommentApproval />} />
+
+            {/* Product Manager Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['product_manager']} />}>
+              <Route path="/product-manager" element={<Dashboard />} />
+              <Route path="/product-manager/products" element={<ProductManagement />} />
+              <Route path="/product-manager/stock" element={<StockManagement />} />
+              <Route path="/product-manager/categories" element={<CategoryManagement />} />
+              <Route path="/product-manager/orders" element={<OrderManagement />} />
+              <Route path="/product-manager/comments" element={<CommentApproval />} />
+            </Route>
+
+            {/* Sales Manager Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['sales_manager']} />}>
+              <Route path="/sales-manager" element={<SalesDashboard />} />
+              <Route path="/sales-manager/discounts" element={<DiscountManagement />} />
+              <Route path="/sales-manager/invoices" element={<InvoiceManagement />} />
+              <Route path="/sales-manager/revenue" element={<RevenueAnalysis />} />
+              <Route path="/sales-manager/refunds" element={<RefundManagement />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={['support_manager']} />}>
+              <Route path="/support/dashboard" element={<SupportAgentDashboard />} />
+            </Route>
           </Routes>
+          {/* Support Chat Widget - Available on all pages */}
+          <SupportChat />
         </div>
       </Router>
     </CartProvider>
