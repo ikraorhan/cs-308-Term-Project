@@ -47,6 +47,7 @@ urlpatterns = [
     
     # Sales Manager Endpoints
     path('sales/discounts/', views.set_product_discount, name='set_product_discount'),
+    path('sales/price/', views.set_product_price, name='set_product_price'),
     path('sales/invoices/', views.get_invoices, name='get_invoices'),
     path('sales/revenue/', views.get_revenue_profit, name='get_revenue_profit'),
     

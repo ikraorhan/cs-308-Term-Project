@@ -147,12 +147,47 @@
   font-size: 14px;
 }
 
+.customer-properties-card {
+  grid-column: span 1;
+}
+
 .addresses-card {
   grid-column: span 2;
 }
 
 .orders-card {
   grid-column: span 2;
+}
+
+.customer-properties-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.property-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.property-row:last-child {
+  border-bottom: none;
+}
+
+.property-label {
+  font-weight: 600;
+  color: #40276d;
+  font-size: 14px;
+}
+
+.property-value {
+  color: #666;
+  font-size: 14px;
+  text-align: right;
+  word-break: break-word;
 }
 
 .address-list {

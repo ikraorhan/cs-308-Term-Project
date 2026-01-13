@@ -1462,6 +1462,81 @@ def set_product_discount(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def set_product_price(request):
+    """Set price for selected products (Sales Manager)"""
+    try:
+        data = request.data
+        product_id = data.get('product_id')
+        price = data.get('price')
+        
+        if not product_id:
+            return Response(
+                {'error': 'product_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if price is None:
+            return Response(
+                {'error': 'price is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            price = float(price)
+            if price < 0:
+                return Response(
+                    {'error': 'price must be greater than or equal to 0'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'price must be a valid number'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not USE_DATABASE or not Product:
+            return Response(
+                {'error': 'Database not available'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        try:
+            product = Product.objects.get(id=product_id)
+            
+            # Save original price if not already saved (before changing price)
+            if not product.original_price:
+                product.original_price = product.price
+            
+            # Update price
+            product.price = price
+            product.save()
+            
+            return Response({
+                'message': 'Product price updated successfully',
+                'product': {
+                    'id': product.id,
+                    'name': product.name,
+                    'old_price': float(product.original_price) if product.original_price else float(product.price),
+                    'new_price': float(product.price)
+                }
+            }, status=status.HTTP_200_OK)
+        
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Product not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    except Exception as e:
+        import traceback
+        return Response({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ========== ORDER CANCELLATION ==========
 
 @api_view(['POST'])

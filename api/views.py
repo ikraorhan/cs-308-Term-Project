@@ -201,6 +201,8 @@ def update_user_profile(request):
             profile.phone = request.data.get('phone', '')
         if 'bio' in request.data:
             profile.bio = request.data.get('bio', '')
+        if 'tax_id' in request.data:
+            profile.tax_id = request.data.get('tax_id', '')
         if 'loyalty_tier' in request.data:
             profile.loyalty_tier = request.data.get('loyalty_tier', '')
         if 'loyalty_points' in request.data:

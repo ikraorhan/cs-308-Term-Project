@@ -165,6 +165,7 @@ function Profile() {
           email: userData.email || prev.email,
           phone: profileData.phone || prev.phone,
           bio: profileData.bio || prev.bio,
+          taxId: profileData.tax_id || prev.taxId || '',
           loyaltyTier: profileData.loyalty_tier || prev.loyaltyTier || 'Standard',
           points: profileData.loyalty_points || prev.points || 0,
           petsSupported: profileData.pets_supported || prev.petsSupported || 0,
@@ -406,6 +407,40 @@ function Profile() {
       </section>
 
       <section className="profile-grid">
+        <article className="profile-card customer-properties-card">
+          <header>
+            <h2>Customer Properties</h2>
+            <p>Your account information and identification details.</p>
+          </header>
+          <div className="customer-properties-list">
+            <div className="property-row">
+              <span className="property-label">Customer ID:</span>
+              <span className="property-value">{profile.id}</span>
+            </div>
+            <div className="property-row">
+              <span className="property-label">Name:</span>
+              <span className="property-value">{profile.name}</span>
+            </div>
+            <div className="property-row">
+              <span className="property-label">Tax ID:</span>
+              <span className="property-value">{profile.taxId || 'Not set'}</span>
+            </div>
+            <div className="property-row">
+              <span className="property-label">E-mail Address:</span>
+              <span className="property-value">{profile.email}</span>
+            </div>
+            <div className="property-row">
+              <span className="property-label">Home Address:</span>
+              <span className="property-value">
+                {profile.addresses && profile.addresses.length > 0 
+                  ? profile.addresses.find(addr => addr.isDefault)?.lines?.join(', ') + ', ' + 
+                    (profile.addresses.find(addr => addr.isDefault)?.city || '')
+                  : 'Not set'}
+              </span>
+            </div>
+          </div>
+        </article>
+
         <article className="profile-card addresses-card">
           <header>
             <h2>Delivery addresses</h2>

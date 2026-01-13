@@ -26,5 +26,9 @@ class DisableCSRFForAPI(MiddlewareMixin):
         if request.path.startswith('/api/support/'):
             setattr(request, '_dont_enforce_csrf_checks', True)
         
+        # Disable CSRF for admin panel (for development)
+        if request.path.startswith('/admin/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        
         return None
 

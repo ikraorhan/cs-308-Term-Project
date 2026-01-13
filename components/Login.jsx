@@ -25,13 +25,19 @@ function Login() {
         // Store user data in localStorage
         storeUserData(user);
 
+        // Set user role - admin users get 'admin' role
+        if (user.is_admin || user.is_staff || user.is_superuser) {
+          localStorage.setItem('user_role', 'admin');
+        } else if (user.profile && user.profile.role) {
+          localStorage.setItem('user_role', user.profile.role);
+        } else {
+          localStorage.setItem('user_role', 'customer');
+        }
+
         // Also store additional profile data if available
         if (user.profile) {
           localStorage.setItem('user_phone', user.profile.phone || '');
           localStorage.setItem('user_bio', user.profile.bio || '');
-          localStorage.setItem('user_role', user.profile.role || 'customer');
-        } else {
-          localStorage.setItem('user_role', 'customer');
         }
 
         // Successful login - redirect to products page
