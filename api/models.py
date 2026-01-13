@@ -15,6 +15,8 @@ class UserProfile(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     phone = models.CharField(max_length=20, blank=True, default='')
     bio = models.TextField(blank=True, default='')
+    tax_id = models.CharField(max_length=50, blank=True, default='')
+    home_address = models.TextField(blank=True, default='')
     loyalty_tier = models.CharField(max_length=50, blank=True, default='')
     loyalty_points = models.IntegerField(default=0)
     pets_supported = models.IntegerField(default=0)
