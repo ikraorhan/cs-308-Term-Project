@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Conversation, Message, Attachment, SupportAgent
+from .models import Conversation, Message, Attachment, SupportAgent, CannedResponse
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -51,7 +51,7 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'customer', 'customer_name', 'agent', 'agent_name', 'status', 
+        fields = ['id', 'customer', 'customer_name', 'agent', 'agent_name', 'status', 'priority', 'tags', 'internal_notes',
                   'guest_session_id', 'messages', 'unread_count', 'created_at', 'updated_at', 'closed_at']
         read_only_fields = ['id', 'created_at', 'updated_at', 'closed_at']
 
@@ -79,7 +79,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'customer', 'customer_name', 'agent', 'agent_name', 'status', 
+        fields = ['id', 'customer', 'customer_name', 'agent', 'agent_name', 'status', 'priority', 'tags',
                   'last_message', 'message_count', 'created_at', 'updated_at']
 
     def get_customer_name(self, obj):
@@ -117,4 +117,11 @@ class CustomerDetailsSerializer(serializers.Serializer):
     order_count = serializers.IntegerField()
     cart_item_count = serializers.IntegerField()
     wishlist_item_count = serializers.IntegerField()
+
+
+class CannedResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CannedResponse
+        fields = ['id', 'title', 'content', 'category', 'created_by', 'created_at', 'updated_at', 'usage_count']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'usage_count']
 

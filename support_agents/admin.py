@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import SupportAgent, Conversation, Message, Attachment
+from .models import SupportAgent, Conversation, Message, Attachment, CannedResponse
 
 
 @admin.register(SupportAgent)
@@ -11,9 +11,9 @@ class SupportAgentAdmin(admin.ModelAdmin):
 
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'customer', 'agent', 'status', 'created_at', 'updated_at']
-    list_filter = ['status', 'created_at']
-    search_fields = ['customer__username', 'customer__email', 'agent__username', 'guest_session_id']
+    list_display = ['id', 'customer', 'agent', 'status', 'priority', 'created_at', 'updated_at']
+    list_filter = ['status', 'priority', 'created_at']
+    search_fields = ['customer__username', 'customer__email', 'agent__username', 'guest_session_id', 'tags']
     readonly_fields = ['created_at', 'updated_at', 'closed_at']
 
 
@@ -31,3 +31,11 @@ class AttachmentAdmin(admin.ModelAdmin):
     list_filter = ['file_type', 'uploaded_at']
     search_fields = ['file_name']
     readonly_fields = ['uploaded_at']
+
+
+@admin.register(CannedResponse)
+class CannedResponseAdmin(admin.ModelAdmin):
+    list_display = ['title', 'category', 'created_by', 'usage_count', 'created_at']
+    list_filter = ['category', 'created_at']
+    search_fields = ['title', 'content', 'category']
+    readonly_fields = ['usage_count', 'created_at', 'updated_at']
